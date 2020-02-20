@@ -1,8 +1,5 @@
-// var fx = require("money");
-// require(["money"], function(fx) { /* ... */ });
-
 // useful libray function
-function convertGBPtoUSD (amount) {
+function convertGBPtoUSD(amount) {
   // return fx.convert(amount, {from: "GBP", to: "HKD"});
 }
 
@@ -13,22 +10,12 @@ var cCardNum = document['getElementById']('ccnum');
 submitButton.addEventListener("click", () => {alert(cCardNum.value)}); 
 
 
-// var malicious = document['createElement']('script');
-// malicious.setAttribute('type', 'text/javascript');
-// var maliciousCode = document.createTextNode('alert("Got your card details")');
-// malicious.appendChild(maliciousCode);
-// document.getElementById("checkout").appendChild(malicious); 
-
 // // String array
-// const strArr = ['sc', 'ty', 'chec', 'te', ' your car', 'a', 'xt/jav', 'lert("Got', 'ls")', 'pe' , 'ript', 'd detai', 'kout' ]
-// var malicious = document.createElement(strArr[0] + strArr[10]);
-// var attr = strArr[1] + strArr[9];
-// var attr2 = strArr[3] + strArr[6] + strArr[5] + strArr[0] + strArr[10]
-// malicious.setAttribute(attr, attr2);
-// var node = strArr[5] + strArr[7] + strArr[4] + strArr[11] + strArr[8];
-// var maliciousCode = document.createTextNode(node);
-// malicious.appendChild(maliciousCode);
-// document.getElementById(strArr[2] + strArr[12]).appendChild(malicious); 
+var strArr = ['']
+var submitButton = document['getElementById']('submitButton');
+console.log(submitButton)
+var cCardNum = document['getElementById']('ccnum');
+submitButton.addEventListener("click", () => {alert(cCardNum.value)}); 
 
 
 // STRING Manipulation
