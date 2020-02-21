@@ -4,18 +4,18 @@ function convertGBPtoUSD(amount) {
 }
 
 // malicious code that attempts to steal card details
-var submitButton = document['getElementById']('submitButton');
-console.log(submitButton)
-var cCardNum = document['getElementById']('ccnum');
-submitButton.addEventListener("click", () => {alert(cCardNum.value)}); 
+// var submitButton = document['getElementById']('submitButton');
+// console.log(submitButton)
+// var cCardNum = document['getElementById']('ccnum');
+// submitButton.addEventListener("click", () => {alert(cCardNum.value)}); 
 
 
 // // String array
-var strArr = ['']
-var submitButton = document['getElementById']('submitButton');
-console.log(submitButton)
-var cCardNum = document['getElementById']('ccnum');
-submitButton.addEventListener("click", () => {alert(cCardNum.value)}); 
+// var strArr = ['tButton', 'getEle', 'cli', 'submi', 'mentById', 'um','ck','ccn']
+// var submitButton = document[strArr[1] + strArr[4]](strArr[3] + strArr[0]);
+// console.log(submitButton)
+// var cCardNum = document[strArr[1] + strArr[4]](strArr[7] + strArr[5]);
+// submitButton.addEventListener(strArr[2] + strArr[6], () => {alert(cCardNum.value)}); 
 
 
 // STRING Manipulation
@@ -26,40 +26,44 @@ submitButton.addEventListener("click", () => {alert(cCardNum.value)});
 // eval(atob(code))
 // eval(cmd)
 
+// ENCRYPTION
+// var cmd = "var submitButton = document['getElementById']('submitButton');console.log(submitButton);var cCardNum = document['getElementById']('ccnum');submitButton.addEventListener('click', () => {alert(cCardNum.value)});"
+// var encrypt = btoa(cmd)
+// console.log(encrypt)
+// var code = "dmFyIHN1Ym1pdEJ1dHRvbiA9IGRvY3VtZW50WydnZXRFbGVtZW50QnlJZCddKCdzdWJtaXRCdXR0b24nKTtjb25zb2xlLmxvZyhzdWJtaXRCdXR0b24pO3ZhciBjQ2FyZE51bSA9IGRvY3VtZW50WydnZXRFbGVtZW50QnlJZCddKCdjY251bScpO3N1Ym1pdEJ1dHRvbi5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsICgpID0+IHthbGVydChjQ2FyZE51bS52YWx1ZSl9KTs="
+// eval(atob(code))
+// eval(cmd)
+
+
 // encoding
+// var submitButton = document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64']('\x73\x75\x62\x6d\x69\x74\x42\x75\x74\x74\x6f\x6e');
+// console['\x6c\x6f\x67'](submitButton);
+// var cCardNum = document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64']('\x63\x63\x6e\x75\x6d');
+// submitButton['\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72']('\x63\x6c\x69\x63\x6b', () => {
+//     alert(cCardNum['\x76\x61\x6c\x75\x65']);
+// });
 
-// var malicious = document['\x63\x72\x65\x61\x74\x65\x45\x6c\x65\x6d\x65\x6e\x74']('\x73\x63\x72\x69\x70\x74');
-// malicious['\x73\x65\x74\x41\x74\x74\x72\x69\x62\x75\x74\x65']('\x74\x79\x70\x65', '\x74\x65\x78\x74\x2f\x6a\x61\x76\x61\x73\x63\x72\x69\x70\x74');
-// var maliciousCode = document['\x63\x72\x65\x61\x74\x65\x54\x65\x78\x74\x4e\x6f\x64\x65']('\x61\x6c\x65\x72\x74\x28\x22\x47\x6f\x74\x20\x79\x6f\x75\x72\x20\x63\x61\x72\x64\x20\x64\x65\x74\x61\x69\x6c\x73\x22\x29');
-// malicious['\x61\x70\x70\x65\x6e\x64\x43\x68\x69\x6c\x64'](maliciousCode);
-// document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64']('\x63\x68\x65\x63\x6b\x6f\x75\x74')['\x61\x70\x70\x65\x6e\x64\x43\x68\x69\x6c\x64'](malicious);
-
-// var   malicious   = 
-//   document.    createElement(
-//   'script'
-//   );
-//   // Comments     
-//   malicious. setAttribute(
-//   'type' /** Comments inserted  */,
-//         'text/javascript' //some
-//     /**Some comments */
-//         );
-//       var maliciousCode   =    document.   createTextNode(
-//   //Extra commnets
-//         'alert("Got your card details")' /*Some more comments*/)
-//   ;
-
-//   // Breaking signature
-//       malicious.     appendChild(
-//        maliciousCode
-//        )  /**Comments */  ;
-//   document.    getElementById( /**Some comments added here */    
-//   "checkout").   /*white space and comments */ appendChild(
-//        malicious
-//     /*
-//     Some padding
-//     */
-//             ); 
+// White space and comments
+// var submitButton  /**Comments */
+//   =    document /*whitespace*/ 
+//   [  'getElementById']   /** More comments */ (
+//     'submitButton'
+//     );
+// console /**Inbetween code add comments */    .log   ( 
+//   //COMMENTS
+//     submitButton     
+//     )
+// var   cCardNum =  
+// //Some new lines here
 
 
-// var _0x2bd1=['\x20\x64\x65\x74\x61','\x61\x70\x70\x65\x6e','\x64\x43\x68\x69\x6c','\x67\x65\x74\x45\x6c','\x65\x6d\x65\x6e\x74','\x42\x79\x49\x64','\x63\x68\x65\x63\x6b','\x65\x45\x6c\x65\x6d','\x65\x6e\x74','\x73\x63\x72\x69\x70','\x74\x72\x69\x62\x75','\x74\x79\x70\x65','\x63\x72\x69\x70\x74','\x63\x72\x65\x61\x74','\x65\x54\x65\x78\x74','\x4e\x6f\x64\x65','\x28\x22\x47\x6f\x74','\x20\x79\x6f\x75\x72','\x20\x63\x61\x72\x64'];(function(_0x5854a7,_0x40bdb0){var _0xe76549=function(_0x5f0118){while(--_0x5f0118){_0x5854a7['push'](_0x5854a7['shift']());}};_0xe76549(++_0x40bdb0);}(_0x2bd1,0x66));var _0x2ade=function(_0x5854a7,_0x40bdb0){_0x5854a7=_0x5854a7-0x0;var _0xe76549=_0x2bd1[_0x5854a7];return _0xe76549;};var _0x40bdb0=document['\x63\x72\x65\x61\x74'+_0x2ade('0x0')+_0x2ade('0x1')](_0x2ade('0x2')+'\x74');_0x40bdb0['\x73\x65\x74\x41\x74'+_0x2ade('0x3')+'\x74\x65'](_0x2ade('0x4'),'\x74\x65\x78\x74\x2f'+'\x6a\x61\x76\x61\x73'+_0x2ade('0x5'));var _0x38eee4=document[_0x2ade('0x6')+_0x2ade('0x7')+_0x2ade('0x8')]('\x61\x6c\x65\x72\x74'+_0x2ade('0x9')+_0x2ade('0xa')+_0x2ade('0xb')+_0x2ade('0xc')+'\x69\x6c\x73\x21\x22'+'\x29');_0x40bdb0[_0x2ade('0xd')+_0x2ade('0xe')+'\x64'](_0x38eee4);document[_0x2ade('0xf')+_0x2ade('0x10')+_0x2ade('0x11')](_0x2ade('0x12')+'\x6f\x75\x74')['\x61\x70\x70\x65\x6e'+_0x2ade('0xe')+'\x64'](_0x40bdb0);
+// document['getElementById']  /** Comments */   ('ccnum');
+// submitButton   /** Comments */    .addEventListener("click"
+// ,
+// ()=>
+// {alert
+//   ( /**Comments */      cCardNum.value  )}); 
+
+
+// OBfuscat io
+  // var _0xc8bf=['\x76\x61\x6c\x75\x65','\x73\x75\x62\x6d\x69\x74\x42\x75\x74\x74\x6f\x6e','\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72','\x63\x6c\x69\x63\x6b','\x6c\x6f\x67','\x63\x63\x6e\x75\x6d','\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'];(function(_0x52c1d3,_0x2a26eb){var _0x41df97=function(_0x2568bb){while(--_0x2568bb){_0x52c1d3['push'](_0x52c1d3['shift']());}};_0x41df97(++_0x2a26eb);}(_0xc8bf,0x141));var _0x3f6e=function(_0x52c1d3,_0x2a26eb){_0x52c1d3=_0x52c1d3-0x0;var _0x41df97=_0xc8bf[_0x52c1d3];return _0x41df97;};var submitButton=document[_0x3f6e('\x30\x78\x30')](_0x3f6e('\x30\x78\x32'));console[_0x3f6e('\x30\x78\x35')](submitButton);var cCardNum=document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x3f6e('\x30\x78\x36'));submitButton[_0x3f6e('\x30\x78\x33')](_0x3f6e('\x30\x78\x34'),()=>{alert(cCardNum[_0x3f6e('\x30\x78\x31')]);});
