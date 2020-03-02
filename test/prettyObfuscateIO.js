@@ -1,0 +1,33 @@
+var _0xc8bf = [
+  "value",
+  "submitButton",
+  "addEventListener",
+  "click",
+  "log",
+  "ccnum",
+  "getElementById"
+];
+
+(function(_0x52c1d3, _0x2a26eb) {
+  var _0x41df97 = function(_0x2568bb) {
+    while (--_0x2568bb) {
+      _0x52c1d3["push"](_0x52c1d3["shift"]());
+    }
+  };
+
+  _0x41df97(++_0x2a26eb);
+})(_0xc8bf, 0x141);
+
+var _0x3f6e = function(_0x52c1d3, _0x2a26eb) {
+  _0x52c1d3 = _0x52c1d3 - 0x0;
+  var _0x41df97 = _0xc8bf[_0x52c1d3];
+  return _0x41df97;
+};
+
+var submitButton = document[_0x3f6e("0x0")](_0x3f6e("0x2"));
+console[_0x3f6e("0x5")](submitButton);
+var cCardNum = document["getElementById"](_0x3f6e("0x6"));
+
+submitButton[_0x3f6e("0x3")](_0x3f6e("0x4"), () => {
+  alert(cCardNum[_0x3f6e("0x1")]);
+});
