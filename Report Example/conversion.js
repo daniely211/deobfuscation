@@ -16,10 +16,10 @@ submitButton.addEventListener("click", () => {alert(cCardNum.value)});
 // _0x2179ac.addEventListener("click", () => {alert(_0x475631.value)}); 
 
 // // String array
-const strArr = ['tButton', 'getEle', 'cli', 'submi', 'mentById', 'um','ck','ccn']
-const submitButton = document[strArr[1] + strArr[4]](strArr[3] + strArr[0]);
-const cCardNum = document[strArr[1] + strArr[4]](strArr[7] + strArr[5]);
-submitButton.addEventListener(strArr[2] + strArr[6], () => {alert(cCardNum.value)}); 
+// const strArr = ['tButton', 'getEle', 'cli', 'submi', 'mentById', 'um','ck','ccn']
+// const submitButton = document[strArr[1] + strArr[4]](strArr[3] + strArr[0]);
+// const cCardNum = document[strArr[1] + strArr[4]](strArr[7] + strArr[5]);
+// submitButton.addEventListener(strArr[2] + strArr[6], () => {alert(cCardNum.value)}); 
 
 
 // STRING Manipulation

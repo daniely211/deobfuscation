@@ -1,2 +1,25 @@
-node_modules/
-package-lock.json
+app/backend/node_modules
+app/backend/package-lock.json
+
+app/deobfuscate-app/node_modules
+app/deobfuscate-app/package-lock.json
+
+app/deobfuscate-app/.pnp
+app/deobfuscate-app/.pnp.js
+
+# testing
+app/deobfuscate-app/coverage
+
+# production
+app/deobfuscate-app/build
+
+# misc
+app/deobfuscate-app/.DS_Store
+app/deobfuscate-app/.env.local
+app/deobfuscate-app/.env.development.local
+app/deobfuscate-app/.env.test.local
+app/deobfuscate-app/.env.production.local
+
+app/deobfuscate-app/npm-debug.log*
+app/deobfuscate-app/yarn-debug.log*
+app/deobfuscate-app/yarn-error.log*
