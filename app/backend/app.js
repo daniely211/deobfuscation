@@ -5,6 +5,7 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const recast = require("recast");
 const putout = require('putout');
+const Iroh = require("iroh");
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var cors = require("cors");
@@ -14,6 +15,9 @@ var pass = require("./Jstillery/src/custom_esmangle_pipeline.js").createPipeline
 var esprima = require('esprima');
 var escodegen = require('escodegen');
 var esmangle = require('esmangle');
+const jsdom = require("jsdom");
+// var isEmpty = require('lodash.isempty');
+const helper = require('./helper')
 
 var app = express();
 app.use(cors());
@@ -22,6 +26,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 let codeRecord = []
 function RemoveCommnets(code) {
+  code = code.replace(`"//"`, `"/"+"/"`)
   return code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g,'')
 }
 
@@ -35,6 +40,171 @@ function removeUnusedVariables(code) {
   });
   return removedUnused.code
 }
+
+
+app.post('/dynamic', function(req, res) {
+  const { JSDOM } = jsdom
+  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+  let log = ''
+  let reRun = false
+  let reRunInstr = [] // 
+
+  const patchDocument = (document) => {
+    // here we patch all the native functions in document so when it gets called we can be alerted
+    //GET ID
+    const defaultGetElementById = document.getElementById.bind(document);
+    document.getElementById = function (id) {
+      log += `DOM INTERACTION:\ndocument.getElementById('${id}') Called\n`
+      const defaultReturn = defaultGetElementById(id)
+      if (!defaultReturn) {
+        // THIS ELEMENT DOESNT EXIST! NEED TO ADD INTO THE DOM!
+        log += `This element doesnt exisit will run the program again with an div id '${id}'\n`
+        reRun = true
+        reRunInstr.push({  env: 'document',
+                          func: 'CreateElemWithID',
+                          params: id
+                        })
+      }
+      return defaultReturn
+    }
+    // TODO Other document functions
+
+    var defaultAddEventListener = dom.window.EventTarget.prototype.addEventListener;
+    dom.window.EventTarget.prototype.addEventListener = function _window_addEventListener(event, listener, useCapture) {
+
+      var id = '';
+      if (this.id) {
+        id = this.id
+      }
+      log += `DOM INTERACTION:\n`
+      log += `Script added event listener for event :(${event}) on element with id '${id}'\n`
+      // TODO WRAP THE FUNCTIONS
+
+      // if (typeof listener == "function") {
+      //   listener = wrappedListener(event, arguments[1])
+      // }
+      defaultAddEventListener.apply(window, [event, listener, useCapture])
+    }
+    return document
+  }
+
+// g = document.createElement('div');
+// g.setAttribute("id", "Div1");
+  const document = patchDocument(dom.window.document)
+  const window = dom.window
+
+  const parsereRunInstr = (instr) => {
+    console.log("parsereRunInstr")
+    console.log(instr)
+    switch(instr.env) {
+      case "document":
+        // THE RERUN INSTRUCTION 
+        switch (instr.func){
+          case "CreateElemWithID":
+            node = document.createElement('div');
+            node.setAttribute("id", instr.params);
+            document.body.appendChild(node)
+            break
+          default:
+
+        }
+        break
+      default:
+        return
+    }
+  }
+
+  try {
+    let originalCode = req.body.source
+    let listener = req.body.listener
+    // DO DYNAMIC ANALYSIS STUFF
+    // console.log(defaultAddEventListener)
+    let stage = new Iroh.Stage(originalCode);
+    // create a listener
+    if (listener) {
+      log += "=======================ADDED LISTENR=======================\n"
+      stage.addListener(Iroh.VAR).on("after", (e) => {
+        log += "--".repeat(e.indent) + `After declaring Variable:\n`
+        log += "--".repeat(e.indent) + `${e.name}=>${helper.formatVariable(e.value)}\n`
+      });
+  
+      stage.addListener(Iroh.ASSIGN).on("fire", (e) => {
+        log += "--".repeat(e.indent) + `Assignment Fire\n`
+        log += "--".repeat(e.indent) + `${e.object}=>${helper.formatVariable(e.value)}\n`
+      });
+  
+      let funclistener = stage.addListener(Iroh.FUNCTION);
+  
+      funclistener.on("enter", (e) => {
+        log += "--".repeat(e.indent) + `Function ${e.name} called with params ${helper.formatVariable(e.value)}\n`
+      });
+  
+      funclistener.on("return", (e) => {
+        log += "--".repeat(e.indent) + `Function ${e.name} Returning ${helper.formatVariable(e.value)}\n`
+      });
+  
+      // stage.addListener(Iroh.UPDATE).on("fire", (e) => {
+      //   // this logs the variable's 'name' and 'value'
+      //   log += `Update Fire\n`
+      //   log += `Prefix${e.prefix} OP:${e.op} = Result${e.result}\n`
+      // });
+  
+      stage.addListener(Iroh.MEMBER).on("fire", (e) => {
+        if (e.property.includes('push') || e.property.includes('shift')) {
+          return
+        }
+        log += `Member Fire:\n`
+        switch(e.object) {
+          case window:
+            log += "--".repeat(e.indent) + `Attempted to call the window Object function ${e.property}\n`
+            break
+          case document:
+            log += "--".repeat(e.indent) + `Attempted to call to document.${e.property}\n`
+            break
+          default:
+            log += "--".repeat(e.indent) + `Object: (${e.object}) Prop: [${e.property}]\n`
+            break
+        }
+      });
+    }
+    
+    let cnt = 0
+    do {
+      cnt++
+      if (cnt > 100) {
+        break;
+      }
+      try {
+          // There are reRun Instructions from previous runs.
+        while(reRunInstr.length > 0){
+          parsereRunInstr(reRunInstr.pop())
+        }
+        log += `=========== Run Number ${cnt}=========\n`
+
+        eval(stage.script);
+        reRun = false; // if the whole script executed without any errors no rerun needed
+        log += `=========== Finished Run ${cnt} run=========\n`
+      } catch (e) {
+        console.log(e)
+        log += e + '\n'
+      }
+    }
+    while (reRun);
+
+    res.status(200);
+    res.json({
+      source: originalCode,
+      log: "Execution log:\n" + log
+    });
+  } catch (e) {
+    console.log(e);
+    res.json({
+      error: e
+    })
+  }
+  res.end();
+  return;
+});
 
 app.post('/undo', function(req, res) {
   try {
@@ -53,12 +223,10 @@ app.post('/undo', function(req, res) {
 });
 
 app.post('/pretty', function(req, res) {
-
   try {
     let originalCode = req.body.source
     codeRecord.push(originalCode)
     let code = RemoveCommnets(originalCode)
-    // code = removeUnusedVariables(code)
     const ast = recast.parse(code)
     let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
     // CHECK IF THE PROCESS CAUSE ANY CHANGE
@@ -108,6 +276,9 @@ app.post('/constantProp', function(req, res) {
   try {
     let originalCode = req.body.source
     codeRecord.push(originalCode)
+    // need to get rid of "//"
+    originalCode = originalCode.replace(`"//"`, `"/"+"/"`)
+
     var ast = esprima.parse(originalCode);
     try{
       ast = esmangle.optimize(ast, pass(), {
@@ -148,15 +319,8 @@ app.post('/execute', function(req, res) {
   try {
     // exectionRecord.push(req.body.source)
     let code = req.body.source
-    // let allCode = exectionRecord.join(';')
-    // let allPrettyCode = exectionRecord.join(';\n')
-    // console.log("in execute")
-    // allCode = exectionRecord.forEach(c => allCode = allCode + ';' + c)
-
-
     // capture all variable definition and calculate their final state
     let evalRes = eval(code)
-    console.log(evalRes)
     res.status(200);
     res.json({
       res: evalRes,
