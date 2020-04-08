@@ -20,6 +20,7 @@
     "lodash.isempty": "^4.4.0",
     "morgan": "~1.9.1",
     "putout": "^7.20.2",
-    "recast": "^0.18.7"
+    "recast": "^0.18.7",
+    "tree-model": "^1.0.7"
   }
 }

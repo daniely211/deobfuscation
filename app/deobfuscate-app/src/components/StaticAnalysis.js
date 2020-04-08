@@ -3,6 +3,13 @@ import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/core/styles';
 import { Controlled as CodeMirror } from 'react-codemirror2'
+import { connect } from 'react-redux'
+import { setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions } from '../actions'
+import MenuItem from '@material-ui/core/MenuItem';
+import Select from '@material-ui/core/Select';
+import FormControl from '@material-ui/core/FormControl';
+import InputLabel from '@material-ui/core/InputLabel';
+
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/material.css');
 require('codemirror/theme/neat.css');
@@ -17,16 +24,17 @@ const useStyles = makeStyles(theme => ({
   editor: {
     margin: '10px',
     border: 'groove'
-  }
+  },
+  formControl: {
+    // margin: theme.spacing(1),
+    minWidth: 120,
+    maxWidth: 300,
+  },
 }));
 
-export default function StaticAnalysis (props) {
-  const { value, index } = props;
-
+function StaticAnalysis (props) {
+  const { value, index, code, setCode, codeTree, setCodeTree, handleFunctionSelect, allFunctionNames, selectedFunctionNames, setFunctionNames } = props;
   const classes = useStyles();
-  const initCode = `var _0xc8bf=['\x76\x61\x6c\x75\x65','\x73\x75\x62\x6d\x69\x74\x42\x75\x74\x74\x6f\x6e','\x61\x64\x64\x45\x76\x65\x6e\x74\x4c\x69\x73\x74\x65\x6e\x65\x72','\x63\x6c\x69\x63\x6b','\x6c\x6f\x67','\x63\x63\x6e\x75\x6d','\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'];(function(_0x52c1d3,_0x2a26eb){var _0x41df97=function(_0x2568bb){while(--_0x2568bb){_0x52c1d3['push'](_0x52c1d3['shift']());}};_0x41df97(++_0x2a26eb);}(_0xc8bf,0x141));var _0x3f6e=function(_0x52c1d3,_0x2a26eb){_0x52c1d3=_0x52c1d3-0x0;var _0x41df97=_0xc8bf[_0x52c1d3];return _0x41df97;};var submitButton=document[_0x3f6e('\x30\x78\x30')](_0x3f6e('\x30\x78\x32'));console[_0x3f6e('\x30\x78\x35')](submitButton);var cCardNum=document['\x67\x65\x74\x45\x6c\x65\x6d\x65\x6e\x74\x42\x79\x49\x64'](_0x3f6e('\x30\x78\x36'));submitButton[_0x3f6e('\x30\x78\x33')](_0x3f6e('\x30\x78\x34'),()=>{alert(cCardNum[_0x3f6e('\x30\x78\x31')]);});`
-  const [code, setCode] = useState(initCode)
-
   const handleClick = (code, path) => {
     fetch(`http://localhost:3001${path}`, {
       method: 'POST',
@@ -41,7 +49,15 @@ export default function StaticAnalysis (props) {
     .then(res => res.json())
     .then(json => {
       const resultCode = json.source? json.source: code
+      const codeTreeString  = json.codeTree? json.codeTree: codeTree
+      const functionNames  = json.functionNames? json.functionNames: []
+      
+      const codeTreeNew = JSON.parse(codeTreeString)
+      // const treeParsed= tree.parse(codeTreeNew)
       setCode(resultCode);
+      setCodeTree(codeTreeNew)
+      setFunctionNames(functionNames)
+
       // if (json.res){
       //   let output = formatVariable(json.res)
       //   setExeResult(output)
@@ -52,7 +68,6 @@ export default function StaticAnalysis (props) {
       throw(err)
     });
   }
-
 
 
   return (
@@ -74,7 +89,7 @@ export default function StaticAnalysis (props) {
               setCode(value)
             }}
             onChange={(editor, data, value) => {
-              setCode(value)
+              // setCode(value)
             }}
           />
         </div>
@@ -91,9 +106,47 @@ export default function StaticAnalysis (props) {
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/undo')}>
             Undo transformation
           </Button>
+          <FormControl className={classes.formControl}>
+            <InputLabel shrink >Functions</InputLabel>
+            <Select
+              value={selectedFunctionNames}
+              onChange={handleFunctionSelect}
+              multiple
+              native
+            >
+              {allFunctionNames.map(name => (
+                // <MenuItem value={name}>{name}</MenuItem>
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+              {/* <MenuItem value={10}>Ten</MenuItem>
+              <MenuItem value={20}>Twenty</MenuItem>
+              <MenuItem value={30}>Thirty</MenuItem> */}
+            </Select>
+          </FormControl>
+          
         </div>
       </React.Fragment>: null}
     </React.Fragment> 
   )
-  
 }
+
+const mapStateToProps = state => {
+  const { staticCode, codeTree,  functionNames, selectedFunctionNames} = state.deobfuscation
+  return ({
+    code: staticCode,
+    codeTree: codeTree,
+    allFunctionNames: functionNames,
+    selectedFunctionNames: selectedFunctionNames
+  })
+}
+
+const mapDispatchToProps = dispatch => ({
+  setCode: (code) => dispatch(setStaticCode(code)),
+  setCodeTree: (tree)=> dispatch(setCodeTree(tree)),
+  setFunctionNames: (functionNames) => dispatch(setFunctionNames(functionNames)),
+  handleFunctionSelect: (event) => dispatch(setSelectedFunctions(event))
+})
+
+export default connect(mapStateToProps, mapDispatchToProps)(StaticAnalysis)

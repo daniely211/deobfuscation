@@ -18,7 +18,12 @@ var esmangle = require('esmangle');
 const jsdom = require("jsdom");
 // var isEmpty = require('lodash.isempty');
 const helper = require('./helper')
-
+var TreeModel = require('tree-model')
+tree = new TreeModel()
+let codeMap = new Map()
+let CodeRoot;
+let codeTreeID = 0;
+let codeCurrentParent;
 var app = express();
 app.use(cors());
 app.use(bodyParser.json());
@@ -29,6 +34,7 @@ function RemoveCommnets(code) {
   code = code.replace(`"//"`, `"/"+"/"`)
   return code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g,'')
 }
+
 
 function removeUnusedVariables(code) {
   // Need to remove all unused variable declaration
@@ -41,10 +47,10 @@ function removeUnusedVariables(code) {
   return removedUnused.code
 }
 
-
 app.post('/dynamic', function(req, res) {
   const { JSDOM } = jsdom
   const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
+  let originalCode = req.body.source
   let log = ''
   let reRun = false
   let reRunInstr = [] // 
@@ -115,7 +121,6 @@ app.post('/dynamic', function(req, res) {
   }
 
   try {
-    let originalCode = req.body.source
     let listener = req.body.listener
     // DO DYNAMIC ANALYSIS STUFF
     // console.log(defaultAddEventListener)
@@ -223,47 +228,97 @@ app.post('/undo', function(req, res) {
 });
 
 app.post('/pretty', function(req, res) {
+  let originalCode = req.body.source
+  if (!CodeRoot) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, originalCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
   try {
-    let originalCode = req.body.source
     codeRecord.push(originalCode)
     let code = RemoveCommnets(originalCode)
     const ast = recast.parse(code)
     let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
+    // get all function names:
+    let functionNames = []
+    recast.visit(ast, {
+      visitFunctionDeclaration(path) {
+        var node = path.node;
+        functionNames.push(node.id.name) 
+    
+        // It's your responsibility to call this.traverse with some
+        // NodePath object (usually the one passed into the visitor
+        // method) before the visitor method returns, or return false to
+        // indicate that the traversal need not continue any further down
+        // this subtree.
+        this.traverse(path);
+      }
+    });
+    
     // CHECK IF THE PROCESS CAUSE ANY CHANGE
     if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()
+    } else {
+      // Theres something new!!
+      // update the code tree with the current parent
+      const newChild = tree.parse({id: codeTreeID, label: "Prettify"})
+      codeMap.set(codeTreeID, output)
+      codeTreeID++
+      codeCurrentParent = codeCurrentParent.addChild(newChild)
     }
-
-    res.status(200);
-    res.json({
-      source: output
+    // console.log(CodeRoot)
+    const treeJson = JSON.stringify(CodeRoot.model)
+    res.status(200).json({
+      source: output,
+      codeTree: treeJson,
+      codeTreeID: codeTreeID,
+      functionNames: functionNames,
     });
   } catch (e) {
-    console.log(e);
-    res.json({
+    console.log(e)
+    return res.json({
       error: e
     })
+    // throw(e)
   }
   res.end();
-  return;
+  return
 });
 
 app.post('/unused', function(req, res) {
+  const originalCode = req.body.source
+  if (!CodeRoot) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, originalCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
   try {
-    codeRecord.push(req.body.source)
-    let changed = removeUnusedVariables(req.body.source)
-    if (req.body.source === changed) {
+    codeRecord.push(originalCode)
+    let output = removeUnusedVariables(originalCode)
+    if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()
+    } else {
+      // Theres something new!!
+      // update the code tree with the current parent
+      const newChild = tree.parse({id: codeTreeID, label:"unused"})
+      codeMap.set(codeTreeID, output)
+      codeTreeID++
+      codeCurrentParent = codeCurrentParent.addChild(newChild)
     }
+    const treeJson = JSON.stringify(CodeRoot.model)
+
 
     res.status(200);
     res.json({
-      source: changed
+      source: output,
+      codeTree: treeJson,
+      codeTreeID: codeTreeID,
     });
   } catch (e) {
-    console.log(e);
     res.json({
       error: e
     })
@@ -272,9 +327,31 @@ app.post('/unused', function(req, res) {
   return;
 });
 
+
+
+app.post('/getNode', function(req, res) {
+  let newID = req.body.newId
+  codeCurrentParent = CodeRoot.first(function (node) {
+    return node.model.id === newID;
+  });
+  const requestedCode = codeMap.get(newID)
+  res.status(200)
+  res.json({
+    source: requestedCode,
+  });
+  res.end()
+})
+
+
 app.post('/constantProp', function(req, res) {
+  let originalCode = req.body.source
+  if (!CodeRoot) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, originalCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
   try {
-    let originalCode = req.body.source
     codeRecord.push(originalCode)
     // need to get rid of "//"
     originalCode = originalCode.replace(`"//"`, `"/"+"/"`)
@@ -291,19 +368,29 @@ app.post('/constantProp', function(req, res) {
     jstiller.init();
     ast = jstiller.deobfuscate(ast, null, true);
 
-    var reduced = escodegen.generate(ast, {
+    var output = escodegen.generate(ast, {
       comment: true
     });
 
-    if (originalCode === reduced) {
+    if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()
+    } else {
+      // Theres something new!!
+      // update the code tree with the current parent
+      const newChild = tree.parse({id: codeTreeID, label:"Constant"})
+      codeMap.set(codeTreeID, output)
+      codeTreeID++
+      codeCurrentParent = codeCurrentParent.addChild(newChild)
     }
 
     res.status(200);
+    const treeJson = JSON.stringify(CodeRoot.model)
 
     res.json({
-      source: reduced
+      source: output,
+      codeTree: treeJson,
+      codeTreeID: codeTreeID
     });
   } catch (e) {
     console.log(e);

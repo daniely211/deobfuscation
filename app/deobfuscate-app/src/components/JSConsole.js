@@ -8,6 +8,9 @@ import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/core/styles';
 import { Controlled as CodeMirror } from 'react-codemirror2'
 import { formatVariable } from '../helper'
+import { setConsoleCode, setConsoleResponse } from '../actions'
+import { connect } from 'react-redux'
+
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/material.css');
 require('codemirror/theme/neat.css');
@@ -25,11 +28,11 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
-export default function JSConsole (props) {
-  const { value, index } = props;
+function JSConsole (props) {
+  const { value, index, exe, exeResult, setExe, setExeResult } = props;
   const classes = useStyles();
-  const [exe, setExe] = useState('')
-  const [exeResult, setExeResult] = useState('')
+  // const [exe, setExe] = useState('')
+  // const [exeResult, setExeResult] = useState('')
 
   const handleClick = (code, path) => {
     fetch(`http://localhost:3001${path}`, {
@@ -58,7 +61,6 @@ export default function JSConsole (props) {
     <React.Fragment>
       {value === index?
         <React.Fragment>
-
           <Typography variant="h3" component="h2">
             Javascript Console
           </Typography>
@@ -99,3 +101,19 @@ export default function JSConsole (props) {
     </React.Fragment>
   )
 }
+
+const mapStateToProps = state => {
+  const { consoleCode, consoleResponse } = state.deobfuscation
+  return ({
+    exe: consoleCode,
+    exeResult: consoleResponse
+  })
+}
+
+const mapDispatchToProps = dispatch => ({
+  setExe: (code) => dispatch(setConsoleCode(code)),
+  setExeResult: (response) => dispatch(setConsoleResponse(response)),
+
+})
+
+export default connect(mapStateToProps, mapDispatchToProps)(JSConsole)

@@ -12,6 +12,9 @@ const formatVariable = (v) => {
   return v
 }
 
+
+
 module.exports = {
-  formatVariable: formatVariable
+  formatVariable: formatVariable,
 };
+
