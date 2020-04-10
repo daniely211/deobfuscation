@@ -49,9 +49,9 @@ function StaticAnalysis (props) {
     .then(res => res.json())
     .then(json => {
       const resultCode = json.source? json.source: code
-      const codeTreeString  = json.codeTree? json.codeTree: codeTree
+      const codeTreeString  = json.codeTree? json.codeTree: JSON.stringify(codeTree)
       const functionNames  = json.functionNames? json.functionNames: []
-      
+      // console.log(codeTreeString)
       const codeTreeNew = JSON.parse(codeTreeString)
       // const treeParsed= tree.parse(codeTreeNew)
       setCode(resultCode);

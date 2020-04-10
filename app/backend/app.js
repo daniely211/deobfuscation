@@ -19,6 +19,10 @@ const jsdom = require("jsdom");
 // var isEmpty = require('lodash.isempty');
 const helper = require('./helper')
 var TreeModel = require('tree-model')
+const n = recast.types.namedTypes;
+const b = recast.types.builders;
+var replace = require('ast-replace');
+
 tree = new TreeModel()
 let codeMap = new Map()
 let CodeRoot;
@@ -227,6 +231,33 @@ app.post('/undo', function(req, res) {
   return;
 });
 
+app.post('/functionInline', function(req, res) {
+  let originalCode = req.body.source
+  let functionName = req.body.functionName
+  const ast = recast.parse(originalCode)
+  recast.visit(ast, {
+    visitFunctionDeclaration(path) {
+      var node = path.node;
+      // functionNames.push(node.id.name) 
+      if (node.id.name === functionName) {
+        // analze and inline the function...
+
+      }
+  
+      this.traverse(path);
+    }
+  });
+  res.status(200);
+  
+  res.json({
+    source: codeRecord.pop()
+  });
+  res.end();
+  return;
+});
+
+
+
 app.post('/pretty', function(req, res) {
   let originalCode = req.body.source
   if (!CodeRoot) {
@@ -245,13 +276,9 @@ app.post('/pretty', function(req, res) {
     recast.visit(ast, {
       visitFunctionDeclaration(path) {
         var node = path.node;
-        functionNames.push(node.id.name) 
-    
-        // It's your responsibility to call this.traverse with some
-        // NodePath object (usually the one passed into the visitor
-        // method) before the visitor method returns, or return false to
-        // indicate that the traversal need not continue any further down
-        // this subtree.
+        let functionName = node.id.name
+        functionNames.push(functionName) 
+
         this.traverse(path);
       }
     });
@@ -270,6 +297,8 @@ app.post('/pretty', function(req, res) {
     }
     // console.log(CodeRoot)
     const treeJson = JSON.stringify(CodeRoot.model)
+
+
     res.status(200).json({
       source: output,
       codeTree: treeJson,
@@ -345,6 +374,7 @@ app.post('/getNode', function(req, res) {
 
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source
+  let functionNameLitMapping = new Map()
   if (!CodeRoot) {
     CodeRoot = tree.parse({id: codeTreeID, label:"root"})
     codeMap.set(codeTreeID, originalCode)
@@ -357,6 +387,85 @@ app.post('/constantProp', function(req, res) {
     originalCode = originalCode.replace(`"//"`, `"/"+"/"`)
 
     var ast = esprima.parse(originalCode);
+    
+    recast.visit(ast, {
+      visitFunctionDeclaration(path) {
+        var node = path.node;
+        let functionName = node.id.name
+        
+        // all functions that simply return a literal inline them
+        
+        if (node.body && node.body.body ){
+          const functionStatements = node.body.body
+          if (functionStatements.length == 1) {
+            const lastStatement = functionStatements[0]
+            if(n.ReturnStatement.check(lastStatement)) {
+              // if the function returns on the last statement,
+              if (n.Literal.check(lastStatement.argument)) {
+                // it returns a literal, now i replace all function calls to this literal
+                const literalstmt =  lastStatement.argument
+                functionNameLitMapping.set(functionName, literalstmt.value)
+                // console.log(functionNameLitMapping)
+              }
+            }
+          }
+        }
+
+
+        this.traverse(path);
+      }
+    });
+
+    // console.log(ast)
+    if (functionNameLitMapping.size > 0) {
+      // we found some functions that just return a literal
+      // now we go through all the calls to functions that has the name in function lit mapping and replace it with a literal
+
+      recast.visit(ast, {
+        // check for all call expression
+
+        visitCallExpression(path) {
+          let node = path.node
+          let callee = node.callee
+          if (n.Identifier.check(callee)){
+            const calleeName = callee.name
+            if (functionNameLitMapping.get(calleeName)) {
+              const litVal = functionNameLitMapping.get(calleeName)
+              // node replace
+              // const literalNode = b.literal(litVal)
+              console.log(node)
+              node.type = "Literal"
+              delete node.callee
+              node.value = litVal
+              delete node.arguments
+              console.log(node)
+
+              // path.node = literalNode
+              // node.value = litVal
+              // node.replace(literalNode)
+              // path.get("elements").replace(literalNode)
+            }
+          }
+          this.traverse(path);
+        },
+
+        visitFunctionDeclaration(path) {
+          var node = path.node;
+          let functionName = node.id.name
+          
+          // all functions that simply return a literal inline them
+          if (functionNameLitMapping.get(functionName)){
+            node = null
+            // get rid of this node
+          }
+          this.traverse(path);
+        }
+
+      })
+    }
+    console.log(ast)
+
+
     try{
       ast = esmangle.optimize(ast, pass(), {
         destructive: true
@@ -371,6 +480,8 @@ app.post('/constantProp', function(req, res) {
     var output = escodegen.generate(ast, {
       comment: true
     });
+
+  
 
     if (originalCode === output) {
       // if the same no new record added
@@ -390,7 +501,7 @@ app.post('/constantProp', function(req, res) {
     res.json({
       source: output,
       codeTree: treeJson,
-      codeTreeID: codeTreeID
+      codeTreeID: codeTreeID,
     });
   } catch (e) {
     console.log(e);
