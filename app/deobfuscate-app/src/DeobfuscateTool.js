@@ -20,7 +20,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import Tree from '@naisutech/react-tree'
-import { setStaticCode } from './actions'
+import { setStaticCode, setCodeTree } from './actions'
 import { connect } from 'react-redux'
 
 require('codemirror/lib/codemirror.css');
@@ -83,7 +83,7 @@ const parseTree = (node, parent=null) => {
 
 
 function DeobfuscateTool(props) {
-  const { codeTree, setCode, code } = props
+  const { codeTree, setCode, code, setCodeTree } = props
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
 
@@ -99,7 +99,26 @@ function DeobfuscateTool(props) {
     // }
   }
 
-  const onSelectCodeID = (selectedNode ) => {
+  const clearHistory = () => {
+    fetch(`http://localhost:3001/clearHistory`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json && json.success){
+          setCodeTree({});
+        }
+      }).catch(err => {
+        throw(err)
+      });
+  
+  }
+
+  const onSelectCodeID = (selectedNode) => {
     // console.log(selectedNode)
     fetch(`http://localhost:3001/getNode`, {
         method: 'POST',
@@ -113,7 +132,6 @@ function DeobfuscateTool(props) {
       })
       .then(res => res.json())
       .then(json => {
-        console.log(json)
         if (json){
           const resultCode = json.source? json.source: code
           setCode(resultCode);
@@ -142,40 +160,41 @@ function DeobfuscateTool(props) {
 
   return (
     <React.Fragment>
-      {/* <div className={classes.tabs}> */}
-        <AppBar position="fixed" className={classes.appBar}>
-          <Tabs value={value} onChange={handleChange} aria-label="simple tabs example">
-            <Tab label="Dynamic Analysis" {...a11yProps(0)} />
-            <Tab label="Static Analysis" {...a11yProps(1)} />
-          </Tabs>
-        </AppBar>
-        <Drawer
-          className={classes.drawer}
-          variant="permanent"
-          classes={{
-            paper: classes.drawerPaper,
-          }}
-          anchor="right"
-        >
-          <Toolbar />
-          <div className={classes.drawerContainer}>
-            <List>
-                <ListItem key={"History"}>
-                  <ListItemText primary={"History"} />
-                </ListItem>
-            </List>
-            <Divider />
-            <div style={{ width: drawerWidth, display: 'flex', flexGrow: 1 }}>
-              <Tree nodes={codeTreeTrans} onSelect={onSelectCodeID} grow theme={'light'} size="half"/>
-            </div>
+      <AppBar position="fixed" className={classes.appBar}>
+        <Tabs value={value} onChange={handleChange} aria-label="simple tabs example">
+          <Tab label="Static Analysis" {...a11yProps(0)} />
+          <Tab label="Dynamic Analysis" {...a11yProps(1)} />
+        </Tabs>
+      </AppBar>
+      <Drawer
+        className={classes.drawer}
+        variant="permanent"
+        classes={{
+          paper: classes.drawerPaper,
+        }}
+        anchor="right"
+      >
+        <Toolbar />
+        <div className={classes.drawerContainer}>
+          <List>
+            <ListItem key={"Clear History"} button onClick={() => clearHistory()}>
+                <ListItemText primary={"Clear"} />
+              </ListItem>
+              <ListItem key={"History"}>
+                <ListItemText primary={"History"} />
+              </ListItem>
+          </List>
+          <Divider />
+          <div style={{ width: drawerWidth, display: 'flex', flexGrow: 1 }}>
+            <Tree nodes={codeTreeTrans} onSelect={onSelectCodeID} grow theme={'light'} size="half"/>
           </div>
-        </Drawer>
-      <main className={classes.content}>
-        <DynamicAnalysis value={value} index={0}/>
-        <StaticAnalysis value={value} index={1}/>
-        <JSConsole/>
-      </main>
-      {/* </div> */}
+        </div>
+      </Drawer>
+    <main className={classes.content}>
+      <StaticAnalysis value={value} index={0}/>
+      <DynamicAnalysis value={value} index={1}/>
+      <JSConsole/>
+    </main>
     </React.Fragment>
   );
 }
@@ -189,7 +208,8 @@ const mapStateToProps = state => {
 }
 
 const mapDispatchToProps = dispatch => ({
-  setCode: (code) => dispatch(setStaticCode(code))
+  setCode: (code) => dispatch(setStaticCode(code)),
+  setCodeTree: (tree)=> dispatch(setCodeTree(tree))
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(DeobfuscateTool)

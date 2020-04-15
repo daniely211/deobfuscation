@@ -21,7 +21,25 @@ const helper = require('./helper')
 var TreeModel = require('tree-model')
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
-var replace = require('ast-replace');
+const krasota = require('krasota')
+const splitVar = require('krasota/lib/beautifiers/split-vars')
+const fs = require('fs')
+const matchTop = krasota.matchTop
+const deobfuscatePlugin = require('babel-plugin-deobfuscate')
+const babelCore = require('babel-core')
+const prettier = require('prettier')
+const commentRemover = require('./commentRemover')
+function illuminateformat (code) {
+  return prettier.format(code)
+    .split('\n')
+    .filter(line => line !== '')
+    .join('\n')
+}
+const generatorOpts = { compact: false }
+
+function illuminateDeobfuscate (code) {
+  return illuminateformat(babelCore.transform(code, { plugins: [ deobfuscatePlugin ], ast: false, generatorOpts }).code)
+}
 
 tree = new TreeModel()
 let codeMap = new Map()
@@ -32,13 +50,13 @@ var app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
 let codeRecord = []
-function RemoveCommnets(code) {
-  code = code.replace(`"//"`, `"/"+"/"`)
-  return code.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g,'')
-}
 
+function RemoveCommnets(code) {
+  let newCode = commentRemover.stripComments(code)
+  console.log(newCode)
+  return newCode
+}
 
 function removeUnusedVariables(code) {
   // Need to remove all unused variable declaration
@@ -50,6 +68,15 @@ function removeUnusedVariables(code) {
   });
   return removedUnused.code
 }
+
+app.get('/clearHistory', function(req, res, next) {
+  CodeRoot = null
+  codeTreeID = 0
+  codeCurrentParent = null
+  res.json({
+    success: true,
+  });
+});
 
 app.post('/dynamic', function(req, res) {
   const { JSDOM } = jsdom
@@ -215,6 +242,7 @@ app.post('/dynamic', function(req, res) {
   return;
 });
 
+
 app.post('/undo', function(req, res) {
   try {
     res.status(200);
@@ -231,34 +259,10 @@ app.post('/undo', function(req, res) {
   return;
 });
 
-app.post('/functionInline', function(req, res) {
-  let originalCode = req.body.source
-  let functionName = req.body.functionName
-  const ast = recast.parse(originalCode)
-  recast.visit(ast, {
-    visitFunctionDeclaration(path) {
-      var node = path.node;
-      // functionNames.push(node.id.name) 
-      if (node.id.name === functionName) {
-        // analze and inline the function...
-
-      }
-  
-      this.traverse(path);
-    }
-  });
-  res.status(200);
-  
-  res.json({
-    source: codeRecord.pop()
-  });
-  res.end();
-  return;
-});
-
-
-
+const TEMP_PATH = 'tmp/split-vars.js'
+const TEMP_OUT_PATH = 'tmp/out.js'
 app.post('/pretty', function(req, res) {
+  let allDeclaredVariables = []
   let originalCode = req.body.source
   if (!CodeRoot) {
     CodeRoot = tree.parse({id: codeTreeID, label:"root"})
@@ -268,21 +272,53 @@ app.post('/pretty', function(req, res) {
   }
   try {
     codeRecord.push(originalCode)
-    let code = RemoveCommnets(originalCode)
+    code = RemoveCommnets(originalCode)
+    // Split all the vars declariation:
+
     const ast = recast.parse(code)
-    let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
     // get all function names:
     let functionNames = []
     recast.visit(ast, {
       visitFunctionDeclaration(path) {
         var node = path.node;
         let functionName = node.id.name
-        functionNames.push(functionName) 
-
+        functionNames.push(functionName)
+        this.traverse(path);
+      },
+      visitVariableDeclarator(path) {
+        var node = path.node
+        allDeclaredVariables.push(node.id.name)
+        this.traverse(path);
+      },
+      visitExpressionStatement(path) {
+        let node = path.node
+        let expr = node.expression
+        if (n.AssignmentExpression.check(expr)) {
+          // Check if the left identifier is defined 
+          let left  = expr.left
+          let right = expr.right
+          if (n.Identifier.check(left)) {
+            let idenName = left.name
+            if (!allDeclaredVariables.includes(idenName)) {
+              // this identifier has not been declared before
+              // We need to change this expression in to a variable declaration
+              node.type = "VariableDeclaration"
+              node.end = node.end + 4 // this is to add the var declaration
+              node.declarations = [{
+                type: "VariableDeclarator",
+                id : left,
+                init: right
+              }]
+              node.kind = "var"
+              allDeclaredVariables = allDeclaredVariables.filter(x => { x != idenName })
+            }     
+          }
+        }
         this.traverse(path);
       }
+
     });
-    
+    let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
     // CHECK IF THE PROCESS CAUSE ANY CHANGE
     if (originalCode === output) {
       // if the same no new record added
@@ -324,9 +360,11 @@ app.post('/unused', function(req, res) {
     codeTreeID++
     codeCurrentParent = CodeRoot
   }
+
   try {
     codeRecord.push(originalCode)
     let output = removeUnusedVariables(originalCode)
+
     if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()
@@ -339,7 +377,6 @@ app.post('/unused', function(req, res) {
       codeCurrentParent = codeCurrentParent.addChild(newChild)
     }
     const treeJson = JSON.stringify(CodeRoot.model)
-
 
     res.status(200);
     res.json({
@@ -356,8 +393,6 @@ app.post('/unused', function(req, res) {
   return;
 });
 
-
-
 app.post('/getNode', function(req, res) {
   let newID = req.body.newId
   codeCurrentParent = CodeRoot.first(function (node) {
@@ -371,7 +406,6 @@ app.post('/getNode', function(req, res) {
   res.end()
 })
 
-
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source
   let functionNameLitMapping = new Map()
@@ -384,39 +418,35 @@ app.post('/constantProp', function(req, res) {
   try {
     codeRecord.push(originalCode)
     // need to get rid of "//"
-    originalCode = originalCode.replace(`"//"`, `"/"+"/"`)
 
-    var ast = esprima.parse(originalCode);
-    
+    let illuminatePropagatedCode = illuminateDeobfuscate(originalCode)
+    illuminatePropagatedCode = illuminatePropagatedCode
+    .replace(`"//"`, `"/"+"/"`)
+    .replace(`'//'`, `'/'+'/'`)
+    .replace(`'http://`, `'http:/'+'/' + '`)
+    .replace(`"http://`, `"http:/"+"/" +"`)
+    var ast = esprima.parse(illuminatePropagatedCode);
     recast.visit(ast, {
       visitFunctionDeclaration(path) {
         var node = path.node;
         let functionName = node.id.name
-        
         // all functions that simply return a literal inline them
-        
         if (node.body && node.body.body ){
           const functionStatements = node.body.body
-          if (functionStatements.length == 1) {
-            const lastStatement = functionStatements[0]
-            if(n.ReturnStatement.check(lastStatement)) {
-              // if the function returns on the last statement,
-              if (n.Literal.check(lastStatement.argument)) {
-                // it returns a literal, now i replace all function calls to this literal
-                const literalstmt =  lastStatement.argument
-                functionNameLitMapping.set(functionName, literalstmt.value)
-                // console.log(functionNameLitMapping)
-              }
+          const lastStatement = functionStatements[functionStatements.length - 1]
+          if(n.ReturnStatement.check(lastStatement)) {
+            // if the function returns on the last statement,
+            if (n.Literal.check(lastStatement.argument)) {
+              // it returns a literal, now i replace all function calls to this literal
+              const literalstmt =  lastStatement.argument
+              functionNameLitMapping.set(functionName, literalstmt.value)
             }
           }
         }
-
-
         this.traverse(path);
       }
     });
 
-    // console.log(ast)
     if (functionNameLitMapping.size > 0) {
       // we found some functions that just return a literal
       // now we go through all the calls to functions that has the name in function lit mapping and replace it with a literal
@@ -433,17 +463,10 @@ app.post('/constantProp', function(req, res) {
               const litVal = functionNameLitMapping.get(calleeName)
               // node replace
               // const literalNode = b.literal(litVal)
-              console.log(node)
               node.type = "Literal"
               delete node.callee
               node.value = litVal
               delete node.arguments
-              console.log(node)
-
-              // path.node = literalNode
-              // node.value = litVal
-              // node.replace(literalNode)
-              // path.get("elements").replace(literalNode)
             }
           }
           this.traverse(path);
@@ -463,7 +486,6 @@ app.post('/constantProp', function(req, res) {
 
       })
     }
-    console.log(ast)
 
 
     try{
@@ -481,7 +503,8 @@ app.post('/constantProp', function(req, res) {
       comment: true
     });
 
-  
+    // let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
+
 
     if (originalCode === output) {
       // if the same no new record added
