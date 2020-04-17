@@ -1160,7 +1160,8 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
           operator: ast.operator,
-          left: ast_reduce(ast.left, scope, false, ast),
+          // left: ast_reduce(ast.left, scope, false, ast),
+          left: ast.left,
           right: ast_reduce_scoped(ast.right)
         };
         debug("OPERATION: AssignmentExpression", parent, (ret))
@@ -3203,7 +3204,9 @@ var jstiller = (function() {
           type: ast.type,
           block: ast_reduce_scoped(ast.block),
           guardedHandlers: ast.guardedHandlers ? ast.guardedHandlers.map(ast_reduce_scoped) : undefined,
-          handlers: ast.handlers ? ast.handlers.map(ast_reduce_scoped) : undefined,
+          // handlers: ast.handlers ? ast.handlers.map(ast_reduce_scoped) : undefined,
+          handler: ast.handler,
+          finalizer: ast.finalizer,
           finalizer: ast_reduce_scoped(ast.finalizer),
         };
 
@@ -3211,13 +3214,15 @@ var jstiller = (function() {
         return {
           type: ast.type,
           param: ast.param,
-          body: ast_reduce_scoped(ast.body)
+          // body: ast_reduce_scoped(ast.body)
+          body: ast.body
         };
 
       case 'ThrowStatement':
         return {
           type: ast.type,
-          argument: ast_reduce_scoped(ast.argument)
+          // argument: ast_reduce_scoped(ast.argument)
+          argument: ast.argument
         };
 
       case 'LabeledStatement':

@@ -41,3 +41,7 @@ export const setSelectedFunctions = (event) => ({
     type: 'SET_SELECTED_FUNCTION_NAME',
     event
 })
+
+export const setShowDiff = () => ({
+    type: 'SET_SHOW_DIFF',
+})

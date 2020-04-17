@@ -4,11 +4,13 @@ import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/core/styles';
 import { Controlled as CodeMirror } from 'react-codemirror2'
 import { connect } from 'react-redux'
-import { setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions } from '../actions'
+import { setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions, setShowDiff } from '../actions'
 import MenuItem from '@material-ui/core/MenuItem';
 import Select from '@material-ui/core/Select';
 import FormControl from '@material-ui/core/FormControl';
 import InputLabel from '@material-ui/core/InputLabel';
+import Switch from '@material-ui/core/Switch';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
 
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/material.css');
@@ -23,7 +25,8 @@ const useStyles = makeStyles(theme => ({
   },
   editor: {
     margin: '10px',
-    border: 'groove'
+    border: 'groove',
+    height: 700
   },
   formControl: {
     // margin: theme.spacing(1),
@@ -33,7 +36,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 function StaticAnalysis (props) {
-  const { value, index, code, setCode, codeTree, setCodeTree, handleFunctionSelect, allFunctionNames, selectedFunctionNames, setFunctionNames } = props;
+  const { value, index, code, setCode, codeTree, setCodeTree, setShowDiff, setFunctionNames, diff } = props;
   const classes = useStyles();
   const handleClick = (code, path) => {
     fetch(`http://localhost:3001${path}`, {
@@ -48,7 +51,7 @@ function StaticAnalysis (props) {
     })
     .then(res => res.json())
     .then(json => {
-      const resultCode = json.source
+      const resultCode = json.source ? json.source : code
       const codeTreeString  = json.codeTree? json.codeTree: JSON.stringify(codeTree)
       const functionNames  = json.functionNames? json.functionNames: []
       // console.log(codeTreeString)
@@ -106,7 +109,7 @@ function StaticAnalysis (props) {
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/undo')}>
             Undo transformation
           </Button>
-          <FormControl className={classes.formControl}>
+          {/* <FormControl className={classes.formControl}>
             <InputLabel shrink >Functions</InputLabel>
             <Select
               value={selectedFunctionNames}
@@ -120,12 +123,10 @@ function StaticAnalysis (props) {
                   {name}
                 </option>
               ))}
-              {/* <MenuItem value={10}>Ten</MenuItem>
-              <MenuItem value={20}>Twenty</MenuItem>
-              <MenuItem value={30}>Thirty</MenuItem> */}
             </Select>
-          </FormControl>
-          
+          </FormControl> */}
+          <FormControlLabel control={<Switch checked={diff} onChange={() => setShowDiff()} name="Show Changes" />} label="Show Changes" />
+
         </div>
       </React.Fragment>: null}
     </React.Fragment> 
@@ -144,6 +145,7 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => ({
   setCode: (code) => dispatch(setStaticCode(code)),
+  setShowDiff: () => dispatch(setShowDiff()),
   setCodeTree: (tree)=> dispatch(setCodeTree(tree)),
   setFunctionNames: (functionNames) => dispatch(setFunctionNames(functionNames)),
   handleFunctionSelect: (event) => dispatch(setSelectedFunctions(event))

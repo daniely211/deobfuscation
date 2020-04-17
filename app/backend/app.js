@@ -54,7 +54,6 @@ let codeRecord = []
 
 function RemoveCommnets(code) {
   let newCode = commentRemover.stripComments(code)
-  console.log(newCode)
   return newCode
 }
 
@@ -264,7 +263,7 @@ const TEMP_OUT_PATH = 'tmp/out.js'
 app.post('/pretty', function(req, res) {
   let allDeclaredVariables = []
   let originalCode = req.body.source
-  if (!CodeRoot) {
+  if (!CodeRoot || !codeCurrentParent) {
     CodeRoot = tree.parse({id: codeTreeID, label:"root"})
     codeMap.set(codeTreeID, originalCode)
     codeTreeID++
@@ -274,7 +273,6 @@ app.post('/pretty', function(req, res) {
     codeRecord.push(originalCode)
     code = RemoveCommnets(originalCode)
     // Split all the vars declariation:
-
     const ast = recast.parse(code)
     // get all function names:
     let functionNames = []
@@ -318,7 +316,7 @@ app.post('/pretty', function(req, res) {
       }
 
     });
-    let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
+    let output = recast.prettyPrint(ast, { tabWidth: 4 }).code;
     // CHECK IF THE PROCESS CAUSE ANY CHANGE
     if (originalCode === output) {
       // if the same no new record added
@@ -329,6 +327,7 @@ app.post('/pretty', function(req, res) {
       const newChild = tree.parse({id: codeTreeID, label: "Prettify"})
       codeMap.set(codeTreeID, output)
       codeTreeID++
+      console.log(codeCurrentParent)
       codeCurrentParent = codeCurrentParent.addChild(newChild)
     }
     // console.log(CodeRoot)
@@ -418,13 +417,15 @@ app.post('/constantProp', function(req, res) {
   try {
     codeRecord.push(originalCode)
     // need to get rid of "//"
-
+    console.log("about use use illuminate")
     let illuminatePropagatedCode = illuminateDeobfuscate(originalCode)
+    console.log("Finished illuminate")
     illuminatePropagatedCode = illuminatePropagatedCode
     .replace(`"//"`, `"/"+"/"`)
     .replace(`'//'`, `'/'+'/'`)
     .replace(`'http://`, `'http:/'+'/' + '`)
     .replace(`"http://`, `"http:/"+"/" +"`)
+    console.log("Esprima prasing...")
     var ast = esprima.parse(illuminatePropagatedCode);
     recast.visit(ast, {
       visitFunctionDeclaration(path) {
@@ -446,7 +447,7 @@ app.post('/constantProp', function(req, res) {
         this.traverse(path);
       }
     });
-
+    console.log("Finished marking functionName and literal maping")
     if (functionNameLitMapping.size > 0) {
       // we found some functions that just return a literal
       // now we go through all the calls to functions that has the name in function lit mapping and replace it with a literal
@@ -487,7 +488,7 @@ app.post('/constantProp', function(req, res) {
       })
     }
 
-
+    console.log("Replacing function calls to ust the literals they return")
     try{
       ast = esmangle.optimize(ast, pass(), {
         destructive: true
@@ -498,13 +499,13 @@ app.post('/constantProp', function(req, res) {
     }
     jstiller.init();
     ast = jstiller.deobfuscate(ast, null, true);
+    console.log("Finished JSTillery deobfusacte")
 
     var output = escodegen.generate(ast, {
-      comment: true
+      comment: false
     });
-
+    console.log("Generated Output")
     // let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
-
 
     if (originalCode === output) {
       // if the same no new record added
@@ -512,6 +513,7 @@ app.post('/constantProp', function(req, res) {
     } else {
       // Theres something new!!
       // update the code tree with the current parent
+      console.log("The generated output is new!")
       const newChild = tree.parse({id: codeTreeID, label:"Constant"})
       codeMap.set(codeTreeID, output)
       codeTreeID++
