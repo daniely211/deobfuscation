@@ -2,9 +2,15 @@
 
 To start the project:
 Open 2 terminals
-CD to the root of the repo and run:
+CD to the root of the repo:
+In one terminal:
+`cd backend`
+`npm instsall`
+`npm start`
 
-`cd backend && npm start`
+In the other terminal:
+`cd deobfuscate-app`
+`npm instsall`
+`npm start`
 
-`cd deobfuscate-app && npm start`
 
