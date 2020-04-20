@@ -803,6 +803,7 @@ var jstiller = (function() {
   }
 
   //var incall=false  Added for knowing when we are in a calling state or declarative.
+  let branchConditions = []
   var gscope = {} //Added for separating global from local.
   var scopes = [gscope];
   var global_this = {
@@ -1165,6 +1166,7 @@ var jstiller = (function() {
           right: ast_reduce_scoped(ast.right)
         };
         debug("OPERATION: AssignmentExpression", parent, (ret))
+        console.log("OPERATION: AssignmentExpression", parent, (ret))
 
         // Checks if assignment is on a variable belonging to an outer scope
         if (scope !== gscope && !scope.closed) {
@@ -1244,9 +1246,12 @@ var jstiller = (function() {
         //if left is Ident and is found in any scope update it with the new rval
         if (ret.left.type === "Identifier") {
           if (ret.left.name in scope) {
+            console.log("Found iden in scope")
             valFromScope = findScope(ret.left.name, scope);
             valScope = valFromScope.scope;
             valFromScope = valFromScope.value;
+            console.log("val From scope")
+            console.log(valFromScope)
           }
         } else if (ret.left.type === "MemberExpression") {
           // var ff={.*};ff.t=4;
@@ -1289,6 +1294,8 @@ var jstiller = (function() {
         //  AssignmentExpression
         if (valScope) { // Found! it's already declared
           debug((valScope), valFromScope);
+          console.log((valScope), valFromScope);
+
           if (!valScope[OBJECTS_NAME]) {
             valScope[OBJECTS_NAME] = [];
           }
@@ -1317,12 +1324,39 @@ var jstiller = (function() {
           if (valFromScope) {
             debug("Identifier and in Scope", ret, parent)
 
+            console.log("Identifier and in Scope", ret, parent)
 
-            valFromScope.pure = _trv.type === "Literal" ? true : false;
-            valFromScope.value = _trv;
+
             if (ret.retVal) {
-              valFromScope.value = ret.retVal;
-              valFromScope.pure = true;
+              // not in a branch
+              console.log("######################## BRANCH CONDITION ATM")
+              console.log(branchConditions)
+              if (branchConditions.length === 0) {
+                valFromScope.value = ret.retVal;
+                valFromScope.pure = true;
+                valFromScope.pure = _trv.type === "Literal" ? true : false;
+                valFromScope.value = _trv;
+              } else {
+                // we are in a branch
+                // Dont just overwrite the value with the new value, check the conditions 
+                // Check if the branch is all true then if it is, overwrite the value, if its not do not.
+                let isAllTrue = true
+                branchConditions.map(node => {
+                  if (!node.type === 'Literal' || !node.value) {
+                    isAllTrue = false
+                    console.log("This is in a false or undertermined branch")
+                    console.log(node)
+                  }
+                })
+                if (isAllTrue) {
+                  console.log("It is all true updating the val from scope")
+                  valFromScope.value = ret.retVal;
+                  valFromScope.pure = false;
+                }
+              }  
+              console.log("Finished updating the val from scope")           
+              console.log(valFromScope)
+              console.log(valScope)
             }
 
             if (ret.left.name in gscope) {
@@ -2225,6 +2259,7 @@ var jstiller = (function() {
 
       case 'Identifier':
         debug("Identifier", ast.name, "scope", (scope), ast.name, "ExpVar?", expandvars)
+        console.log("Identifier", ast.name, "scope", (scope), ast.name, "ExpVar?", expandvars)
         var isLocal = false;
         valFromScope = false;
         if (inLoop)
@@ -2236,6 +2271,8 @@ var jstiller = (function() {
           valFromScope = findScope(ast.name, scope);
           isLocal = valFromScope.scope === scope && parent.type !== 'MemberExpression'
           debug("scoped", 'isLocal', valFromScope.scope === scope, 'isGlobal', scope === gscope);
+          console.log("scoped", 'isLocal', valFromScope.scope === scope, 'isGlobal', scope === gscope);
+
           if (valFromScope.scope !== scope) {
             scope.closed = false;
 
@@ -2248,6 +2285,7 @@ var jstiller = (function() {
         } else if (global_vars.indexOf(ast.name) !== -1 && scope.closed !== false) {
           scope.closed = true;
           debug(ast)
+          console.log(ast)
           if (ast.name === 'undefined' && ast.value === undefined) {
             ast.value = undefined;
             ast.pure = true;
@@ -2276,7 +2314,6 @@ var jstiller = (function() {
 
         if (ast.name in scope && valFromScope.pure) { // pure==Literals
           value = mkliteral(valFromScope.value);
-
         } else if (ast.name in scope &&
           (valFromScope.purable || valFromScope.pure_global)) {
 
@@ -2918,13 +2955,19 @@ var jstiller = (function() {
 
       case 'ReturnStatement':
         debug('ReturnStatement');
+
+        console.log('ReturnStatement');
         if(ast.argument==null){
           return ast;
         }
+        console.log("ReturnStatement before:", (ast.argument))
+
         value = ast_reduce(ast.argument, scope, true, ast);
         scope.returns = scope.hasOwnProperty("returns") ? ++scope.returns : 1;
 
         debug("ReturnStatement :", (value), (ast.argument))
+        console.log("ReturnStatement :", (value), (ast.argument))
+
         if (value.type === 'SequenceExpression') {
           ret = {
             type: 'BlockStatement',
@@ -2974,16 +3017,46 @@ var jstiller = (function() {
           ret.pure = ret.argument && (ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
         }
         debug("RET PURE:", ret.pure, ret.argument === value, ret.argument === ast.argument)
+        console.log("RET PURE:", ret.pure, ret.argument === value, ret.argument === ast.argument)
+
         return ret;
 
 
       case 'IfStatement':
+        console.log("Evaluating if statement")
+        console.log(ast)
+        console.log(ast.test)
+        // TODO the scope of consequent and alternate is not the same cannot affect each other....
+        let testReduced = ast_reduce_scoped(ast.test)
+        console.log("######PUSHING BRANCH CONDITION")
+        branchConditions.push(testReduced)
+        console.log(branchConditions)
+        let consequentReduced = ast_reduce_scoped(ast.consequent)
+        console.log("######POPING BRANCH CONDITION")
+        branchConditions.pop()
+        let negatedTest = {
+          type: "UnaryExpression",
+          operator: "!",
+          prefix: true,
+          argument: testReduced
+        }
+        console.log("######PUSHING BRANCH CONDITION")
+        branchConditions.push(ast_reduce_scoped(negatedTest))
+        console.log(branchConditions)
+
+        let alternateReduced = ast_reduce_scoped(ast.alternate)
+        console.log("######POPING BRANCH CONDITION")
+        branchConditions.pop()
+
         ret = {
           type: 'IfStatement',
-          test: ast_reduce_scoped(ast.test), //Expand or Not?Lookahead?
-          consequent: ast_reduce_scoped(ast.consequent),
-          alternate: ast_reduce_scoped(ast.alternate)
+          test: testReduced, //Expand or Not?Lookahead?
+          consequent: consequentReduced,
+          alternate: alternateReduced
         };
+        console.log("The full version")
+        console.log(ret)
+        console.log(ret.test)
         if (ret.test.pure) {
           if (ret.test.value && ret.consequent.pure) {
             return ret.consequent;

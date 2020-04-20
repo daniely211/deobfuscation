@@ -94,6 +94,17 @@ function StaticAnalysis (props) {
             onChange={(editor, data, value) => {
               // setCode(value)
             }}
+            // selection={{
+            //   ranges: [{
+            //     anchor: {ch: 8, line: 5},
+            //     head: {ch: 37, line: 5}
+            //   }],
+            //   focus: true // defaults false if not specified
+            // }}
+            // onSelection={(editor, data) => {
+            //   console.log(editor)
+            //   console.log(data)
+            // }}
           />
         </div>
         <div className={classes.buttons}>
