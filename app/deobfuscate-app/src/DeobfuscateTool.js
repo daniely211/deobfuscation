@@ -171,6 +171,9 @@ function DeobfuscateTool(props) {
           const codeTreeNew = JSON.parse(json.codeTree)
           setCodeTree(codeTreeNew)
         }
+        if (json.source) {
+          setCode(json.source)
+        }
       }).catch(err => {
         setCode("Error in fetch");
         throw(err)

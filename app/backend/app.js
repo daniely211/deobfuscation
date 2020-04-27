@@ -450,14 +450,19 @@ app.post('/getNode', function(req, res) {
 
 
 app.get('/getHistory', function(req, res, next) {
-  console.log("GETTING HISTORY")
+  // console.log("GETTING HISTORY")
   res.status(200)
   let treeJson = '{}'
   if (CodeRoot) {
     treeJson = JSON.stringify(CodeRoot.model)
   }
+  let newestCode = ''
+  if (codeMap.size > 0) {
+    newestCode = codeMap.get(codeTreeID - 1)
+  }
   res.json({
     codeTree: treeJson,
+    source: newestCode
   });
 
   res.end()
