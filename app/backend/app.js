@@ -7,7 +7,6 @@ const recast = require("recast");
 const putout = require('putout');
 const Iroh = require("iroh");
 var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
 var cors = require("cors");
 var bodyParser = require('body-parser');
 var jstiller = require('./Jstillery/src/jstiller');
@@ -21,11 +20,7 @@ const helper = require('./helper')
 var TreeModel = require('tree-model')
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
-const krasota = require('krasota')
-const splitVar = require('krasota/lib/beautifiers/split-vars')
-const fs = require('fs')
-const matchTop = krasota.matchTop
-const deobfuscatePlugin = require('babel-plugin-deobfuscate')
+const deobfuscatePlugin = require('./babel-plugin-deobfuscate')
 const babelCore = require('babel-core')
 const prettier = require('prettier')
 const commentRemover = require('./commentRemover')
@@ -53,7 +48,11 @@ app.use(bodyParser.urlencoded({ extended: false }));
 let codeRecord = []
 
 function RemoveCommnets(code) {
-  let newCode = commentRemover.stripComments(code)
+  let newCode = code.replace(`"//"`, `"/"+"/"`)
+  .replace(`'//'`, `'/'+'/'`)
+  .replace(`'http://`, `'http:/'+'/' + '`)
+  .replace(`"http://`, `"http:/"+"/" +"`)
+  newCode = commentRemover.stripComments(newCode)
   return newCode
 }
 
@@ -258,8 +257,46 @@ app.post('/undo', function(req, res) {
   return;
 });
 
-const TEMP_PATH = 'tmp/split-vars.js'
-const TEMP_OUT_PATH = 'tmp/out.js'
+app.post('/save', function(req, res) {
+  let newCode = req.body.source
+  if (!CodeRoot || !codeCurrentParent) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, newCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
+  let treeJson
+  if (codeRecord.length > 0) {
+    lastCode = codeRecord.pop(newCode)
+    if (newCode === lastCode) {
+    // if the same no new record added
+    codeRecord.pop()
+    treeJson = JSON.stringify(CodeRoot.model)
+    res.status(200).json({
+      success: true,
+      codeTree: treeJson,
+    });
+    res.end();
+    return
+    }
+  }
+
+  const newChild = tree.parse({id: codeTreeID, label: "Saved"})
+  codeMap.set(codeTreeID, newCode)
+  codeTreeID++
+  console.log(codeCurrentParent)
+  codeCurrentParent = codeCurrentParent.addChild(newChild)
+  treeJson = JSON.stringify(CodeRoot.model)
+
+  res.status(200).json({
+    success: true,
+    codeTree: treeJson,
+  });
+
+  res.end();
+  return;
+})  
+
 app.post('/pretty', function(req, res) {
   let allDeclaredVariables = []
   let originalCode = req.body.source
@@ -273,6 +310,8 @@ app.post('/pretty', function(req, res) {
     codeRecord.push(originalCode)
     code = RemoveCommnets(originalCode)
     // Split all the vars declariation:
+    // console.log(code)
+
     const ast = recast.parse(code)
     // get all function names:
     let functionNames = []
@@ -394,9 +433,13 @@ app.post('/unused', function(req, res) {
 
 app.post('/getNode', function(req, res) {
   let newID = req.body.newId
-  codeCurrentParent = CodeRoot.first(function (node) {
-    return node.model.id === newID;
-  });
+  let diff = req.body.diff
+  if (!diff) {
+    codeCurrentParent = CodeRoot.first(function (node) {
+      return node.model.id === newID;
+    });
+  }
+
   const requestedCode = codeMap.get(newID)
   res.status(200)
   res.json({
@@ -404,6 +447,22 @@ app.post('/getNode', function(req, res) {
   });
   res.end()
 })
+
+
+app.get('/getHistory', function(req, res, next) {
+  console.log("GETTING HISTORY")
+  res.status(200)
+  let treeJson = '{}'
+  if (CodeRoot) {
+    treeJson = JSON.stringify(CodeRoot.model)
+  }
+  res.json({
+    codeTree: treeJson,
+  });
+
+  res.end()
+});
+
 
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source
@@ -417,9 +476,14 @@ app.post('/constantProp', function(req, res) {
   try {
     codeRecord.push(originalCode)
     // need to get rid of "//"
+
+    // find the functions that used array indexing
+    // then call the illuminate for it
     console.log("about use use illuminate")
     let illuminatePropagatedCode = illuminateDeobfuscate(originalCode)
+    // let illuminatePropagatedCode = originalCode
     console.log("Finished illuminate")
+
     illuminatePropagatedCode = illuminatePropagatedCode
     .replace(`"//"`, `"/"+"/"`)
     .replace(`'//'`, `'/'+'/'`)
@@ -570,7 +634,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
 // app.use('/pretty', prettyRouter);
 
 // catch 404 and forward to error handler

@@ -1166,7 +1166,7 @@ var jstiller = (function() {
           right: ast_reduce_scoped(ast.right)
         };
         debug("OPERATION: AssignmentExpression", parent, (ret))
-        console.log("OPERATION: AssignmentExpression", parent, (ret))
+        // console.log("OPERATION: AssignmentExpression", parent, (ret))
 
         // Checks if assignment is on a variable belonging to an outer scope
         if (scope !== gscope && !scope.closed) {
@@ -1246,12 +1246,12 @@ var jstiller = (function() {
         //if left is Ident and is found in any scope update it with the new rval
         if (ret.left.type === "Identifier") {
           if (ret.left.name in scope) {
-            console.log("Found iden in scope")
+            // console.log("Found iden in scope")
             valFromScope = findScope(ret.left.name, scope);
             valScope = valFromScope.scope;
             valFromScope = valFromScope.value;
-            console.log("val From scope")
-            console.log(valFromScope)
+            // console.log("val From scope")
+            // console.log(valFromScope)
           }
         } else if (ret.left.type === "MemberExpression") {
           // var ff={.*};ff.t=4;
@@ -1294,7 +1294,7 @@ var jstiller = (function() {
         //  AssignmentExpression
         if (valScope) { // Found! it's already declared
           debug((valScope), valFromScope);
-          console.log((valScope), valFromScope);
+          // console.log((valScope), valFromScope);
 
           if (!valScope[OBJECTS_NAME]) {
             valScope[OBJECTS_NAME] = [];
@@ -1325,11 +1325,11 @@ var jstiller = (function() {
             debug("Identifier and in Scope", ret, parent)
             // Set the variable to be changed so when next time its used, dont propagate the constnat.
             valFromScope.changed = true;
-            console.log("Identifier and in Scope", ret, parent)
+            // console.log("Identifier and in Scope", ret, parent)
             if (ret.retVal) {
               // not in a branch
-              console.log("######################## BRANCH CONDITION ATM")
-              console.log(branchConditions)
+              // console.log("######################## BRANCH CONDITION ATM")
+              // console.log(branchConditions)
               if (branchConditions.length === 0) {
                 valFromScope.value = ret.retVal;
                 valFromScope.pure = _trv.type === "Literal" ? true : false;
@@ -1342,19 +1342,19 @@ var jstiller = (function() {
                 branchConditions.map(node => {
                   if (!node.type === 'Literal' || !node.value) {
                     isAllTrue = false
-                    console.log("This is in a false or undertermined branch")
-                    console.log(node)
+                    // console.log("This is in a false or undertermined branch")
+                    // console.log(node)
                   }
                 })
                 if (isAllTrue) {
-                  console.log("It is all true updating the val from scope")
+                  // console.log("It is all true updating the val from scope")
                   valFromScope.value = ret.retVal;
                   valFromScope.pure = false;
                 }
               }  
-              console.log("Finished updating the val from scope")           
-              console.log(valFromScope)
-              console.log(valScope)
+              // console.log("Finished updating the val from scope")           
+              // console.log(valFromScope)
+              // console.log(valScope)
             }
 
             if (ret.left.name in gscope) {
@@ -3051,7 +3051,7 @@ var jstiller = (function() {
 
         ret = {
           type: 'IfStatement',
-          test: testReduced, //Expand or Not?Lookahead?
+          test: ast.test, //Expand or Not?Lookahead?
           consequent: consequentReduced,
           alternate: alternateReduced
         };

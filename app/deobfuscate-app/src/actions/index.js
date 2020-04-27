@@ -45,3 +45,13 @@ export const setSelectedFunctions = (event) => ({
 export const setShowDiff = () => ({
     type: 'SET_SHOW_DIFF',
 })
+
+export const setOldCode = (code) => ({
+    type: 'SET_OLD_CODE',
+    code
+})
+
+export const setReMountMergeCode = () => ({
+    type: 'SET_REMOUNT_MERGE_CODE',
+})
+

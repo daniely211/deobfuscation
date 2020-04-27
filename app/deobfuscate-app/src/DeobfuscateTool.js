@@ -20,7 +20,7 @@ import ListItemText from '@material-ui/core/ListItemText';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import Tree from '@naisutech/react-tree'
-import { setStaticCode, setCodeTree } from './actions'
+import { setStaticCode, setCodeTree, setOldCode, setReMountMergeCode } from './actions'
 import { connect } from 'react-redux'
 
 require('codemirror/lib/codemirror.css');
@@ -30,7 +30,7 @@ require('codemirror/mode/xml/xml.js');
 require('codemirror/mode/javascript/javascript.js');
 
 const drawerWidth = 240;
-
+let fetched = false
 const useStyles = makeStyles((theme) => ({
   tabs: {
     // flexGrow: 1,
@@ -65,7 +65,7 @@ const parseTree = (node, parent=null) => {
   const thisNode = {
     "id": node.id,
     "parentId": parent,
-    "label": node.label
+    "label": `${node.id}-${node.label}`
   }
   if (!node.children || (node.children && node.children.length == 0)) {
     return thisNode
@@ -83,7 +83,7 @@ const parseTree = (node, parent=null) => {
 
 
 function DeobfuscateTool(props) {
-  const { codeTree, setCode, code, setCodeTree } = props
+  const { codeTree, setCode, code, setCodeTree, setOldCode, diff, setReMountMergeCode } = props
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
 
@@ -112,14 +112,14 @@ function DeobfuscateTool(props) {
         if (json && json.success){
           setCodeTree({});
         }
+
       }).catch(err => {
         throw(err)
       });
   
   }
 
-  const onSelectCodeID = (selectedNode) => {
-    // console.log(selectedNode)
+  const onSelectCodeID = (selectedNode, diff) => {
     fetch(`http://localhost:3001/getNode`, {
         method: 'POST',
         headers: {
@@ -128,27 +128,57 @@ function DeobfuscateTool(props) {
         },
         body: JSON.stringify({
           newId: selectedNode.id,
+          diff: diff
         })
       })
       .then(res => res.json())
       .then(json => {
         if (json){
           const resultCode = json.source? json.source: code
-          setCode(resultCode);
+          if (diff) {
+            setReMountMergeCode()
+            setOldCode(resultCode);
+          } else {
+            setCode(resultCode);
+          }
         }
         
       }).catch(err => {
         setCode("Error in fetch");
         throw(err)
       });
-  
+
   }
 
   useEffect(() => {
-    document.addEventListener('keydown', refreshHandler);
-    return function cleanup() {
-      document.removeEventListener('keydown', refreshHandler);
-    };
+    // document.addEventListener('keydown', refreshHandler);
+    // return function cleanup() {
+    //   document.removeEventListener('keydown', refreshHandler);
+    // };
+    if (!fetched) {
+      fetch(`http://localhost:3001/getHistory`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(res => res.json())
+      .then(json => {
+        fetched = true
+        console.log(json)
+        if (json.codeTree) {
+          const codeTreeNew = JSON.parse(json.codeTree)
+          setCodeTree(codeTreeNew)
+        }
+      }).catch(err => {
+        setCode("Error in fetch");
+        throw(err)
+      });
+    }
+    
+
+
   });
 
   function a11yProps(index) {
@@ -186,30 +216,33 @@ function DeobfuscateTool(props) {
           </List>
           <Divider />
           <div style={{ width: drawerWidth, display: 'flex', flexGrow: 1 }}>
-            <Tree nodes={codeTreeTrans} onSelect={onSelectCodeID} grow theme={'light'} size="half"/>
+            <Tree nodes={codeTreeTrans} onSelect={(id) => onSelectCodeID(id, diff)} grow theme={'light'} size="half"/>
           </div>
         </div>
       </Drawer>
     <main className={classes.content}>
       <StaticAnalysis value={value} index={0}/>
       <DynamicAnalysis value={value} index={1}/>
-      <JSConsole/>
+      {/* <JSConsole/> */}
     </main>
     </React.Fragment>
   );
 }
 
 const mapStateToProps = state => {
-  const { codeTree, staticCode } = state.deobfuscation
+  const { codeTree, staticCode, diff } = state.deobfuscation
   return ({
     codeTree: codeTree,
-    code: staticCode
+    code: staticCode,
+    diff: diff
   })
 }
 
 const mapDispatchToProps = dispatch => ({
   setCode: (code) => dispatch(setStaticCode(code)),
-  setCodeTree: (tree)=> dispatch(setCodeTree(tree))
+  setCodeTree: (tree)=> dispatch(setCodeTree(tree)),
+  setOldCode: (code) => dispatch(setOldCode(code)),
+  setReMountMergeCode: () => dispatch(setReMountMergeCode()),
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(DeobfuscateTool)
