@@ -4,10 +4,11 @@ import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/core/styles';
 import { Controlled as CodeMirror } from 'react-codemirror2'
 import { connect } from 'react-redux'
-import { setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions, setShowDiff, setOldCode } from '../actions'
+import { setSavedFiles, setFilenameSave, setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions, setShowDiff, setOldCode } from '../actions'
 import Switch from '@material-ui/core/Switch';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import MergeCodeTextArea from './MergeCodeTextArea';
+import TextField from '@material-ui/core/TextField';
 
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/material.css');
@@ -40,11 +41,11 @@ const useStyles = makeStyles(theme => ({
 }));
 
 function StaticAnalysis (props) {
-  const { reMountMergeCode, value, index, code, setOldCode, setCode, codeTree, setCodeTree, setShowDiff, setFunctionNames, diff } = props;
+  const { setSavedFiles, saveFilename, handleFilenameChange, reMountMergeCode, value, index, code, setCode, setCodeTree, setShowDiff, setFunctionNames, diff } = props;
   const classes = useStyles();
 
-  const handleClick = (code, path) => {
-    setOldCode(code);
+  const handleClick = (code, path, filename=null) => {
+    // setOldCode(code);
 
     fetch(`http://localhost:3001${path}`, {
       method: 'POST',
@@ -54,6 +55,7 @@ function StaticAnalysis (props) {
       },
       body: JSON.stringify({
         source: code,
+        filename: filename
       })
     })
     .then(res => res.json())
@@ -67,6 +69,11 @@ function StaticAnalysis (props) {
       }
       if (json.functionNames) {
         setFunctionNames(json.functionNames)
+      }
+
+      if (json.listFiles) {
+        setSavedFiles(json.listFiles)
+
       }
       
 
@@ -134,8 +141,12 @@ function StaticAnalysis (props) {
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/undo')}>
             Undo transformation
           </Button>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/save')}>
-            Save
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/checkpoint')}>
+            Checkpoint
+          </Button>
+          <TextField label="Filename to save" onChange={e => handleFilenameChange(e)}/>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/save', saveFilename)}>
+            Save Progress
           </Button>
           {/* <FormControl className={classes.formControl}>
             <InputLabel shrink >Functions</InputLabel>
@@ -162,7 +173,7 @@ function StaticAnalysis (props) {
 }
 
 const mapStateToProps = state => {
-  const { staticCode, lastCode,  codeTree,  functionNames, selectedFunctionNames, diff, reMountMergeCode} = state.deobfuscation
+  const { saveFilename, staticCode, lastCode,  codeTree,  functionNames, selectedFunctionNames, diff, reMountMergeCode} = state.deobfuscation
   return ({
     code: staticCode,
     lastCode: lastCode,
@@ -170,7 +181,8 @@ const mapStateToProps = state => {
     allFunctionNames: functionNames,
     selectedFunctionNames: selectedFunctionNames,
     diff: diff,
-    reMountMergeCode: reMountMergeCode
+    reMountMergeCode: reMountMergeCode,
+    saveFilename: saveFilename
   })
 }
 
@@ -180,7 +192,9 @@ const mapDispatchToProps = dispatch => ({
   setShowDiff: () => dispatch(setShowDiff()),
   setCodeTree: (tree)=> dispatch(setCodeTree(tree)),
   setFunctionNames: (functionNames) => dispatch(setFunctionNames(functionNames)),
-  handleFunctionSelect: (event) => dispatch(setSelectedFunctions(event))
+  handleFunctionSelect: (event) => dispatch(setSelectedFunctions(event)),
+  handleFilenameChange: (event) => dispatch(setFilenameSave(event)),
+  setSavedFiles: (fileList) => dispatch(setSavedFiles(fileList)),
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(StaticAnalysis)

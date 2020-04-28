@@ -13,6 +13,17 @@ export const setConsoleCode = code => ({
     code
 })
 
+export const setSavedFiles = listFiles => ({
+    type: 'SET_SAVED_FILES',
+    listFiles
+})
+export const setFilenameSave = event => ({
+    type: 'SET_FILENAME_SAVE',
+    event
+})
+
+
+
 export const setConsoleResponse = response => ({
     type: 'SET_CONSOLE_RESPONSE',
     response

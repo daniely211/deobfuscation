@@ -24,6 +24,7 @@ const deobfuscatePlugin = require('./babel-plugin-deobfuscate')
 const babelCore = require('babel-core')
 const prettier = require('prettier')
 const commentRemover = require('./commentRemover')
+const fs = require('fs')
 function illuminateformat (code) {
   return prettier.format(code)
     .split('\n')
@@ -40,6 +41,7 @@ tree = new TreeModel()
 let codeMap = new Map()
 let CodeRoot;
 let codeTreeID = 0;
+let saves = 0;
 let codeCurrentParent;
 var app = express();
 app.use(cors());
@@ -257,7 +259,7 @@ app.post('/undo', function(req, res) {
   return;
 });
 
-app.post('/save', function(req, res) {
+app.post('/checkpoint', function(req, res) {
   let newCode = req.body.source
   if (!CodeRoot || !codeCurrentParent) {
     CodeRoot = tree.parse({id: codeTreeID, label:"root"})
@@ -281,7 +283,7 @@ app.post('/save', function(req, res) {
     }
   }
 
-  const newChild = tree.parse({id: codeTreeID, label: "Saved"})
+  const newChild = tree.parse({id: codeTreeID, label: "Checkpoint"})
   codeMap.set(codeTreeID, newCode)
   codeTreeID++
   console.log(codeCurrentParent)
@@ -291,6 +293,58 @@ app.post('/save', function(req, res) {
   res.status(200).json({
     success: true,
     codeTree: treeJson,
+  });
+
+  res.end();
+  return;
+})  
+
+
+app.post('/save', function(req, res) {
+  // save the current state into a json file
+  let treeJson = JSON.stringify(CodeRoot.model)
+  let currentCode = req.body.source
+  let filename = req.body.filename? req.body.filename: saves++
+  console.log("Saving file ", filename)
+  let codeMapList = Array.from(codeMap.entries())
+  console.log(codeCurrentParent)
+  let codeCurrentParentstr = JSON.stringify(codeCurrentParent.model)
+  let saveData = {
+    codeTree: treeJson,
+    codeMapList: codeMapList,
+    codeCurrentParentstr: codeCurrentParentstr,
+    codeTreeID: codeTreeID,
+    source: currentCode
+  }
+  let saveDataStr =  JSON.stringify(saveData)
+  console.log("writing to file")
+  fs.writeFileSync( './saves/' + filename + '.json', saveDataStr)
+  console.log("Finsied writing to file")
+  listFiles = fs.readdirSync('./saves')
+  res.status(200).json({
+    success: true,
+    saves: filename,
+    listFiles: listFiles
+  });
+
+  res.end();
+  return;
+})  
+
+app.post('/load', function(req, res) {
+  let filename = req.body.filename
+  console.log("loading file ", filename)
+  console.log(filename)
+  let saveDataStr = fs.readFileSync( './saves/' + filename)
+  let saveData = JSON.parse(saveDataStr)
+  codeTreeID = saveData.codeTreeID
+  CodeRoot = tree.parse(JSON.parse(saveData.codeTree))
+  codeCurrentParent = tree.parse(JSON.parse(saveData.codeCurrentParentstr))
+  codeMap = new Map(saveData.codeMapList);
+
+  res.status(200).json({
+    codeTree: saveData.codeTree,
+    source: saveData.source
   });
 
   res.end();
@@ -434,12 +488,12 @@ app.post('/unused', function(req, res) {
 app.post('/getNode', function(req, res) {
   let newID = req.body.newId
   let diff = req.body.diff
+  console.log("Get Node id:" + newID)
   if (!diff) {
     codeCurrentParent = CodeRoot.first(function (node) {
       return node.model.id === newID;
     });
   }
-
   const requestedCode = codeMap.get(newID)
   res.status(200)
   res.json({
@@ -447,7 +501,6 @@ app.post('/getNode', function(req, res) {
   });
   res.end()
 })
-
 
 app.get('/getHistory', function(req, res, next) {
   // console.log("GETTING HISTORY")
@@ -460,9 +513,23 @@ app.get('/getHistory', function(req, res, next) {
   if (codeMap.size > 0) {
     newestCode = codeMap.get(codeTreeID - 1)
   }
+  let listFiles = []
+  // fs.readdir('./saves', (err, files) => {
+  //   if (err) {
+  //     return console.log('Unable to scan directory: ' + err);
+  //   } 
+  //   files.forEach(function (file) {
+  //     // Do whatever you want to do with the file
+  //     console.log(file); 
+  //     listFiles.push(file)
+  //   });
+  // })
+  listFiles = fs.readdirSync('./saves')
+  console.log(listFiles)
   res.json({
     codeTree: treeJson,
-    source: newestCode
+    source: newestCode,
+    listFiles: listFiles
   });
 
   res.end()
