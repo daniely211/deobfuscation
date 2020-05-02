@@ -60,43 +60,21 @@ function JSConsole (props) {
   return (
     <React.Fragment>
       {value === index?
-        <React.Fragment>
-          <Typography variant="h3" component="h2">
-            Javascript Console
-          </Typography>
-          <div className={classes.editor}>
-            <CodeMirror
-              value={exe}
-              options={{
-                lineNumbers: true,
-                mode: {name: "javascript", json: false},
-              }}
-              onBeforeChange={(editor, data, value) => {
-                setExe(value)
-              }}
-              onChange={(editor, data, value) => {
-                setExe(value)
-              }}
-            />
-          </div>
-          <div className={classes.buttons}>
-            <Button variant="contained" color="primary" onClick={() => handleClick(exe, '/execute')}>
-              Execute
-            </Button>
-          </div>
-          <div className={classes.editor}>
-            <Editor
-              value={exeResult}
-              onValueChange={code => setExeResult(code)}
-              highlight={code => (code)}
-              padding={10}
-              style={{
-                fontFamily: '"Fira code", "Fira Mono", monospace',
-                fontSize: 12,
-              }}
-            />
-          </div>
-        </React.Fragment>
+        <div className={classes.editor}>
+          <CodeMirror
+            value={exe}
+            options={{
+              lineNumbers: true,
+              mode: {name: "javascript", json: false},
+            }}
+            onBeforeChange={(editor, data, value) => {
+              setExe(value)
+            }}
+            onChange={(editor, data, value) => {
+              setExe(value)
+            }}
+          />
+        </div>
       :null}
     </React.Fragment>
   )

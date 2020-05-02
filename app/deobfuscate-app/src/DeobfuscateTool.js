@@ -289,9 +289,8 @@ function DeobfuscateTool(props) {
             {saves.map(filename => (
               <ListItem key={filename} button onClick={() => loadFile(filename)}>
                 <ListItemText primary={filename} />
-              </ListItem>)
-            )
-            }
+              </ListItem>
+            ))}
 
           </List>
         </TabPanel>
@@ -300,7 +299,7 @@ function DeobfuscateTool(props) {
     <main className={classes.content}>
       <StaticAnalysis value={value} index={0}/>
       <DynamicAnalysis value={value} index={1}/>
-      {/* <JSConsole/> */}
+      <JSConsole/>
     </main>
     </React.Fragment>
   );

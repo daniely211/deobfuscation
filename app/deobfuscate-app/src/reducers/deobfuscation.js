@@ -31,7 +31,8 @@ const defaultState = {
     codeTree: {},
     diff: false,
     reMountMergeCode: false,
-    saves: []
+    saves: [],
+    marktextRet: null,
 }
 
 const deobfuscation = (state = defaultState, action) => {
@@ -46,6 +47,14 @@ const deobfuscation = (state = defaultState, action) => {
             return Object.assign({}, state, {executionLog: action.log})
         case 'SET_CONSOLE_CODE':
             return Object.assign({}, state, {consoleCode: action.code})
+        case 'CLEAR_MARK_TEXT':
+            if (state.marktextRet) {
+                console.log("clearing")
+                state.marktextRet.forEach(marker => marker.clear());
+            }
+            return state
+        case 'SET_MARKTEXT_RET':
+            return Object.assign({}, state, {marktextRet: action.marktextRet})
         case 'SET_CONSOLE_RESPONSE':
             return Object.assign({}, state, {consoleResponse: action.response})
         case 'SET_DETAILS':
@@ -57,7 +66,7 @@ const deobfuscation = (state = defaultState, action) => {
         case 'SET_CODE_TREE':
             return Object.assign({}, state, {codeTree: action.treeJson})
         case 'SET_FILENAME_SAVE':
-            return Object.assign({}, state, {saveFilename: action.event.target.value})
+            return Object.assign({}, state, {saveFilename: action.fileName})
         case 'SET_SAVED_FILES':
             return Object.assign({}, state, {saves: action.listFiles})
             

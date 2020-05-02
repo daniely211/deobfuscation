@@ -17,11 +17,21 @@ export const setSavedFiles = listFiles => ({
     type: 'SET_SAVED_FILES',
     listFiles
 })
-export const setFilenameSave = event => ({
-    type: 'SET_FILENAME_SAVE',
-    event
+
+export const clearMarkText = () => ({
+    type: 'CLEAR_MARK_TEXT',
 })
 
+
+export const setFilenameSave = fileName => ({
+    type: 'SET_FILENAME_SAVE',
+    fileName
+})
+
+export const setMarkTextRet = marktextRet => ({
+    type: 'SET_MARKTEXT_RET',
+    marktextRet
+})
 
 
 export const setConsoleResponse = response => ({

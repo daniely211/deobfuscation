@@ -1,15 +1,16 @@
-import React, { useState,  } from 'react';
+import React, { useState } from 'react';
 import Typography from '@material-ui/core/Typography';
 import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/core/styles';
 import { Controlled as CodeMirror } from 'react-codemirror2'
 import { connect } from 'react-redux'
-import { setSavedFiles, setFilenameSave, setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions, setShowDiff, setOldCode } from '../actions'
+import { clearMarkText, setSavedFiles, setFilenameSave, setStaticCode, setCodeTree, setFunctionNames, setSelectedFunctions, setShowDiff, setOldCode, setMarkTextRet } from '../actions'
 import Switch from '@material-ui/core/Switch';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import MergeCodeTextArea from './MergeCodeTextArea';
 import TextField from '@material-ui/core/TextField';
 
+require('codemirror/addon/search/searchcursor.js');
 require('codemirror/lib/codemirror.css');
 require('codemirror/theme/material.css');
 require('codemirror/theme/neat.css');
@@ -30,7 +31,7 @@ const useStyles = makeStyles(theme => ({
   },
   editor: {
     margin: '10px',
-    border: 'groove',
+    border: 'groove', 
     height: 700
   },
   formControl: {
@@ -41,11 +42,10 @@ const useStyles = makeStyles(theme => ({
 }));
 
 function StaticAnalysis (props) {
-  const { setSavedFiles, saveFilename, handleFilenameChange, reMountMergeCode, value, index, code, setCode, setCodeTree, setShowDiff, setFunctionNames, diff } = props;
+  const { clearMarkText, setMarkTextRet, setOldCode, setSavedFiles, saveFilename, handleFilenameChange, reMountMergeCode, value, index, code, setCode, setCodeTree, setShowDiff, setFunctionNames, diff } = props;
   const classes = useStyles();
-
   const handleClick = (code, path, filename=null) => {
-    // setOldCode(code);
+    setOldCode(code);
 
     fetch(`http://localhost:3001${path}`, {
       method: 'POST',
@@ -60,6 +60,10 @@ function StaticAnalysis (props) {
     })
     .then(res => res.json())
     .then(json => {
+
+      if (path === '/save') {
+        handleFilenameChange('')
+      }
       if (json.source) {
         setCode(json.source)
       }
@@ -87,7 +91,6 @@ function StaticAnalysis (props) {
       throw(err)
     });
   }
-
 
   return (
     <React.Fragment>
@@ -118,10 +121,30 @@ function StaticAnalysis (props) {
                 // }],
                 // focus: true // defaults false if not specified
               }}
-              // onSelection={(editor, data) => {
-              //   console.log(editor)
-              //   console.log(data)
-              // }}
+              onSelection={(editor, data, ) => {
+                let ranges = data.ranges[0]
+                let anchor = ranges.anchor
+                let head = ranges.head
+                clearMarkText()
+                if (JSON.stringify(head) === JSON.stringify(anchor) ) {
+                  console.log("This is a click not hightlight")
+                  console.log(data)
+                  let selected = editor.getTokenAt(head)
+                  console.log(selected.string)
+                  let cursor = editor.getSearchCursor(selected.string)
+                  let markers = []
+                  while (cursor.findNext()) {
+                    console.log("Found 1")
+                    let mark = editor.markText(
+                      cursor.from(),
+                      cursor.to(),
+                      { className: 'highlight' }
+                    );
+                    markers.push(mark)
+                  } 
+                  setMarkTextRet(markers)
+                }
+              }}
             />
           :
           <MergeCodeTextArea key={reMountMergeCode} />
@@ -144,7 +167,7 @@ function StaticAnalysis (props) {
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/checkpoint')}>
             Checkpoint
           </Button>
-          <TextField label="Filename to save" onChange={e => handleFilenameChange(e)}/>
+          <TextField label="Filename to save" onChange={e => handleFilenameChange(e.target.value)} value={saveFilename}/>
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/save', saveFilename)}>
             Save Progress
           </Button>
@@ -173,7 +196,8 @@ function StaticAnalysis (props) {
 }
 
 const mapStateToProps = state => {
-  const { saveFilename, staticCode, lastCode,  codeTree,  functionNames, selectedFunctionNames, diff, reMountMergeCode} = state.deobfuscation
+  const { marktextRet, saveFilename, staticCode, lastCode,  codeTree,  functionNames, selectedFunctionNames, diff, reMountMergeCode} = state.deobfuscation
+  console.log(marktextRet)
   return ({
     code: staticCode,
     lastCode: lastCode,
@@ -182,7 +206,7 @@ const mapStateToProps = state => {
     selectedFunctionNames: selectedFunctionNames,
     diff: diff,
     reMountMergeCode: reMountMergeCode,
-    saveFilename: saveFilename
+    saveFilename: saveFilename,
   })
 }
 
@@ -195,6 +219,8 @@ const mapDispatchToProps = dispatch => ({
   handleFunctionSelect: (event) => dispatch(setSelectedFunctions(event)),
   handleFilenameChange: (event) => dispatch(setFilenameSave(event)),
   setSavedFiles: (fileList) => dispatch(setSavedFiles(fileList)),
+  setMarkTextRet: (marktextRet) => dispatch(setMarkTextRet(marktextRet)),
+  clearMarkText:  () => dispatch(clearMarkText()),
 })
 
 export default connect(mapStateToProps, mapDispatchToProps)(StaticAnalysis)

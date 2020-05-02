@@ -15,6 +15,11 @@
 .CodeMirror {
   height: 700px !important;
 }
+
+.highlight {
+  background-color: #ecebf3;
+}
+
 .App-header {
   background-color: #282c34;
   min-height: 100vh;

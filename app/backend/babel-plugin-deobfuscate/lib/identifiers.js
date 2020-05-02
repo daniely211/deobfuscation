@@ -16,6 +16,8 @@ function evaluate(path) {
         return u.someLiteral(binding.value);
     }
     if (binding.constant && binding.path.parentKey === 'declarations' && !isSelfReferencingInDeclaration(path, binding)) {
+        // console.log("19")
+        // console.log(binding)
         var init = evaluateInit(path, binding);
         // Handle member assigments
         if (init && u.hasValue(init)) {
@@ -73,6 +75,11 @@ function evaluateInit(path, binding) {
         return null;
     }
     var init = binding.path.get('init');
+    // if (!init.type) {
+    //     console.log("init type is empty")
+    //     console.log(path.node.type)
+    //     return path.node
+    // }
     return expressions_1.evaluateExpression(init);
 }
 /** This occurs bindings are shadowed and is required to break infinite recursion. */

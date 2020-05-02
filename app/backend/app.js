@@ -41,7 +41,6 @@ tree = new TreeModel()
 let codeMap = new Map()
 let CodeRoot;
 let codeTreeID = 0;
-let saves = 0;
 let codeCurrentParent;
 var app = express();
 app.use(cors());
@@ -304,7 +303,7 @@ app.post('/save', function(req, res) {
   // save the current state into a json file
   let treeJson = JSON.stringify(CodeRoot.model)
   let currentCode = req.body.source
-  let filename = req.body.filename? req.body.filename: saves++
+  let filename = req.body.filename? req.body.filename: Date.now()
   console.log("Saving file ", filename)
   let codeMapList = Array.from(codeMap.entries())
   console.log(codeCurrentParent)
@@ -535,6 +534,18 @@ app.get('/getHistory', function(req, res, next) {
   res.end()
 });
 
+// check the 2017 result is correct
+// fixing highlight in diff when code changes.
+// Symbolic replacemnet of activeXObject 
+
+// Replace variable usage 
+// EG:
+// function qBE(aDt) {
+//   const rPj = aDt.GetSpecialFolder(2) + "\\" + aDt.GetTempName();
+//   return rPj;
+// }
+
+// symbolicaly save some variable states
 
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source

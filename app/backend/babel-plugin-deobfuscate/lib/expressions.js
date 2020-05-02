@@ -27,6 +27,9 @@ function deobfuscateExpression(path) {
 }
 exports.deobfuscateExpression = deobfuscateExpression;
 function evaluateExpression(path) {
+    // console.log("Evaluate expression func expr")
+    // console.log(path.node)
+    // console.log(path.node.type)
     path.assertExpression();
     var evaluate = evaluator(path);
     return evaluate(path) || path.node;
