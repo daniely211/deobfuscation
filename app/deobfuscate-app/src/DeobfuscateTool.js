@@ -167,10 +167,8 @@ function DeobfuscateTool(props) {
       });
   
   }
-  
 
   const onSelectCodeID = (selectedNode, diff) => {
-    console.log(selectedNode.id)
     fetch(`http://localhost:3001/getNode`, {
         method: 'POST',
         headers: {

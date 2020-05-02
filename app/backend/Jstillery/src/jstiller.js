@@ -524,19 +524,24 @@ var jstiller = (function() {
         _obj.name = _obj.proparr[0];
         _obj.proparr = _obj.proparr.slice(1);
     }
+
     if (_obj && _obj.name in scope) { //was it found in scope? 
       debug("In SCOPE!")
+      debug("In SCOPE!")
+
       _tscope = findScope(_obj.name, scope);
       _sval = _tscope.value;
       if (scope !== _tscope.scope && scope.closed) {
         debug("CLOSED!")
         scope.closed = false;
       }
-      if (!_sval.value)
+      if (!_sval.value){
         return {
           resolved: false,
           scope: false
         };
+      }
+        
 
       _lval = astMemberExpr.property; // last one 
 
@@ -556,6 +561,10 @@ var jstiller = (function() {
       ;
 
       debug("V______", (_sval), (_tscope), _obj)
+      if (_sval.value.type === 'Identifier') {
+        astMemberExpr.object.name = _sval.value.name
+        return { resolved: true, value: astMemberExpr, isIdentifier: true }
+      }
       if (!_sval.value[CURRENT_OBJ]) {
         //fun()['g'] < something like that
         return {
@@ -1422,6 +1431,8 @@ var jstiller = (function() {
           callee: ast.callee
         };
         var realCallee = ast.callee
+        // console.log("Call Expression Jstillery")
+        // console.log(ast)
         if (ast.callee.type === 'SequenceExpression') {
           // is a comma separated sequence, we need to reduce everything
           // but last one then reduce the arguments, then 
@@ -1456,7 +1467,6 @@ var jstiller = (function() {
 
           if (e.type === 'Identifier' && e.name in scope) {
             valScope = findScope(e.name, scope);
-
             return valScope && valScope.value && valScope.value.value && valScope.value.value.pure;
           }
           return e.pure || e.simpleType || e.type === 'ObjectExpression';
@@ -1485,11 +1495,16 @@ var jstiller = (function() {
             && realCallee.body.body.length > 0
             && realCallee.body.body[realCallee.body.body.length - 1].type === "ReturnStatement";
         }
-
+        // console.log("Real Callee")
+        // console.log(realCallee)
         if (realCallee.type === "MemberExpression") {
           value = resolveMemberExpression(realCallee, scope, true);
-
+          // console.log("Real callee is a memberExpression")
+          // console.log(value)
           if (value.resolved) {
+            // console.log("value is resolved ")
+            // 
+
             if (value.isGlobal && value.proparr.length === 0) {
               value = value.resolved;
               ret.callee = realCallee = value.key;
@@ -1497,6 +1512,10 @@ var jstiller = (function() {
                 _tmp.expressions[_tmp.expressions.length - 1] = realCallee;
                 ret.callee = _tmp;
               }
+            } else if (value.isIdentifier && value.value)  {
+              console.log("The memberExpression callee is an identifier replaced")
+              ret.callee = value.value
+              realCallee = value.value;
             } else if (value.resolved.type === "Property") {
               value = value.resolved;
 
@@ -1519,9 +1538,9 @@ var jstiller = (function() {
           }
         }
 
-
         if (1 && realCallee.type === "Identifier" && realCallee.name in scope) {
           //Look for declared function and see if the scope is closed.
+
           valScope = findScope(realCallee.name, scope);
           if (valScope && valScope.value.value) {
             valFromScope = valScope.value.value;
@@ -1549,6 +1568,7 @@ var jstiller = (function() {
 
           value = ret.arguments;
           debug("Function", value);
+
           var _tast,
             _params = [],
             _fbody,
@@ -1772,7 +1792,7 @@ var jstiller = (function() {
 
         if (realCallee && realCallee.property && methods1.indexOf(realCallee.property.name) !== -1) {
           var strMet = realCallee.property.name;
-
+          // console.log(1803)
           if (match(realCallee, {
               type: 'MemberExpression',
               object: {
@@ -1783,7 +1803,7 @@ var jstiller = (function() {
                 name: strMet
               }
             }) && ret.purearg) {
-
+              // console.log(1816)
             value = realCallee.object.value[strMet].apply(realCallee.object.value,
               ret.arguments.map(getValue));
             return mkliteral(value);
@@ -1801,7 +1821,7 @@ var jstiller = (function() {
               name: "replace"
             }
           }) && ret.arguments[0].type === "Literal" && ret.arguments[1].type === "Literal") {
-
+            // console.log(1832)
           value = realCallee.object.value.replace.apply(realCallee.object.value,
             ret.arguments.map(getValue));
           return mkliteral(value);
@@ -1937,13 +1957,18 @@ var jstiller = (function() {
 
         //
         if (realCallee.type === "Identifier") {
+          // console.log("Identifier 1965")
           valFromScope = findScope(realCallee.name, scope);
           if (valFromScope && valFromScope.value && valFromScope.value.value) {
             if ((valFromScope.value.value.type === 'FunctionExpression' || valFromScope.value.value.type === 'FunctionDeclaration')
               && !valFromScope.value.value.alreadyReduced) {
+              // console.log("AST Reduced")
               value = ast_reduce_scoped(valFromScope.value.value);
+              // console.log(value)
             } else {
               value = valFromScope.value.value;
+              // console.log("Not val from scope")
+              // console.log(value)
             }
 
             if (value.body && value.body.pure) {
@@ -1957,7 +1982,10 @@ var jstiller = (function() {
         }
         var calleeBody = realCallee.body ? realCallee.body : (realCallee.resolve_to ? realCallee.resolve_to.body : null);
         if (calleeBody && calleeBody.pure) {
+          // console.log("1969")
+
           if (calleeBody.body && calleeBody.body.length > 0 && calleeBody.body[calleeBody.body.length - 1].type === "ReturnStatement") {
+            // console.log("1972")
             return mkliteral(calleeBody.value);
           } else {
             calleeBody.retVal = mkliteral(calleeBody.value);
@@ -1966,7 +1994,9 @@ var jstiller = (function() {
           && calleeBody.scope.returns === 1) {
           //TODO   We need to copy the function scope and add params values!! tmp_scope = Object.create(calleBody.scope)
           //       Copy all values.
+          // console.log("1981")
           var _callee = realCallee.params ? realCallee : (realCallee.resolve_to.params ? realCallee.resolve_to : null);
+          // console.log(_callee)
           var tmp_scope = Object.create(calleeBody.scope);
           _callee.params.map(function(p, i) {
 
@@ -1981,12 +2011,15 @@ var jstiller = (function() {
               pure: false
             };
           });
+
           return ast_reduce(calleeBody.body[0].argument, tmp_scope, expandvars, ast);
         }
         //Has body or resolve_to with body and has only return statement
+        ret.callee = realCallee
 
         //debug("************************",ret.purearg,realCallee, realCallee.body , realCallee.callable,"************")
         if (ret.purearg && realCallee.body && (expandvars || realCallee.body.scope.closed) && realCallee.callable) {
+          // console.log("2003")
           try {
             var simple_types = ['number', 'string', 'boolean', 'undefined']
             if (realCallee.resolve_to) {

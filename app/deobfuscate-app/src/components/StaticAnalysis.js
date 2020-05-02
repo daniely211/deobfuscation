@@ -127,14 +127,10 @@ function StaticAnalysis (props) {
                 let head = ranges.head
                 clearMarkText()
                 if (JSON.stringify(head) === JSON.stringify(anchor) ) {
-                  console.log("This is a click not hightlight")
-                  console.log(data)
                   let selected = editor.getTokenAt(head)
-                  console.log(selected.string)
                   let cursor = editor.getSearchCursor(selected.string)
                   let markers = []
                   while (cursor.findNext()) {
-                    console.log("Found 1")
                     let mark = editor.markText(
                       cursor.from(),
                       cursor.to(),
@@ -197,7 +193,6 @@ function StaticAnalysis (props) {
 
 const mapStateToProps = state => {
   const { marktextRet, saveFilename, staticCode, lastCode,  codeTree,  functionNames, selectedFunctionNames, diff, reMountMergeCode} = state.deobfuscation
-  console.log(marktextRet)
   return ({
     code: staticCode,
     lastCode: lastCode,
