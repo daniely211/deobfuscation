@@ -527,10 +527,10 @@ var jstiller = (function() {
 
     if (_obj && _obj.name in scope) { //was it found in scope? 
       debug("In SCOPE!")
-      debug("In SCOPE!")
-
       _tscope = findScope(_obj.name, scope);
       _sval = _tscope.value;
+
+
       if (scope !== _tscope.scope && scope.closed) {
         debug("CLOSED!")
         scope.closed = false;
@@ -542,9 +542,7 @@ var jstiller = (function() {
         };
       }
         
-
       _lval = astMemberExpr.property; // last one 
-
       if (_sval.pure_global) {
         return {
           isGLobal: true,
@@ -565,6 +563,24 @@ var jstiller = (function() {
         astMemberExpr.object.name = _sval.value.name
         return { resolved: true, value: astMemberExpr, isIdentifier: true }
       }
+
+      if (_sval.value.type === "CallExpression") {
+        console.log("The object of the memberexpr is a callexpr")
+        // console.log("We need to evaluate it first then")
+        // console.log(_sval.value)
+        astMemberExpr.object = _sval.value
+
+        return {
+          resolved: true,
+          value: astMemberExpr,
+          callExpr: true 
+        }
+        // const res = ast_reduce(_sval.value)
+        // console.log("THe result is :!!!!")
+        // console.log(res)
+      }
+
+
       if (!_sval.value[CURRENT_OBJ]) {
         //fun()['g'] < something like that
         return {
@@ -576,6 +592,7 @@ var jstiller = (function() {
       if (_sval.value[CURRENT_OBJ].type === "ObjectExpression" || _sval.value[CURRENT_OBJ].type === "ArrayExpression") {
         _lval = findPropFromAST(_sval.value[CURRENT_OBJ], _obj.proparr);
         debug("Here", _lval)
+
       // _lval will be
       // returns:   {result:FinalProp,isNative:false} if fully resolved
       // returns:   {result:LastPropertyResolved,isNative:true,k:latestPropId} if native
@@ -860,9 +877,7 @@ var jstiller = (function() {
     };
     // if(ast.called && ast.called_with_args){
     //   debugger;
-    //   console.log(ast.called_with_args,scope);
     //   ast.called_with_args.map(ast_reduce_scoped);
-    //   console.log(ast.called_with_args,scope);
     // }
     var ret, // astnode used to create returning clean node
       left,
@@ -890,7 +905,9 @@ var jstiller = (function() {
 
         left = ast_reduce_scoped(ast.left);
         right = ast_reduce_scoped(ast.right);
-        
+        let leftPure = left.pure || left.purearg || left.canPure
+        let rightPure = right.pure || right.purearg || right.canPure
+        let binPure = leftPure & rightPure
         if (!right) {
           debug("NO RIGHT!!");
           process.exit(1);
@@ -1036,7 +1053,8 @@ var jstiller = (function() {
                 type: ast.type,
                 operator: ast.operator,
                 left: left ? left : ast.left,
-                right: right ? right : ast.right
+                right: right ? right : ast.right,
+                canPure: binPure
               };
             }
           }
@@ -1044,7 +1062,8 @@ var jstiller = (function() {
             type: ast.type,
             operator: ast.operator,
             left: left,
-            right: right
+            right: right,
+            canPure: binPure
           };
         }
 
@@ -1430,9 +1449,9 @@ var jstiller = (function() {
           arguments: ast.arguments,
           callee: ast.callee
         };
+        console.log("Call expr")
+        console.log(ast)
         var realCallee = ast.callee
-        // console.log("Call Expression Jstillery")
-        // console.log(ast)
         if (ast.callee.type === 'SequenceExpression') {
           // is a comma separated sequence, we need to reduce everything
           // but last one then reduce the arguments, then 
@@ -1495,16 +1514,11 @@ var jstiller = (function() {
             && realCallee.body.body.length > 0
             && realCallee.body.body[realCallee.body.body.length - 1].type === "ReturnStatement";
         }
-        // console.log("Real Callee")
-        // console.log(realCallee)
         if (realCallee.type === "MemberExpression") {
+          console.log("member ")
           value = resolveMemberExpression(realCallee, scope, true);
-          // console.log("Real callee is a memberExpression")
-          // console.log(value)
+          console.log(value)
           if (value.resolved) {
-            // console.log("value is resolved ")
-            // 
-
             if (value.isGlobal && value.proparr.length === 0) {
               value = value.resolved;
               ret.callee = realCallee = value.key;
@@ -1512,6 +1526,10 @@ var jstiller = (function() {
                 _tmp.expressions[_tmp.expressions.length - 1] = realCallee;
                 ret.callee = _tmp;
               }
+            } else if (value.callExpr && value.value)  {
+              console.log("The memberExpression callee is an Call expr replaced")
+              ret.callee = value.value
+              realCallee = value.value;
             } else if (value.isIdentifier && value.value)  {
               console.log("The memberExpression callee is an identifier replaced")
               ret.callee = value.value
@@ -1537,11 +1555,11 @@ var jstiller = (function() {
             }
           }
         }
-
         if (1 && realCallee.type === "Identifier" && realCallee.name in scope) {
           //Look for declared function and see if the scope is closed.
 
           valScope = findScope(realCallee.name, scope);
+
           if (valScope && valScope.value.value) {
             valFromScope = valScope.value.value;
 
@@ -1792,7 +1810,6 @@ var jstiller = (function() {
 
         if (realCallee && realCallee.property && methods1.indexOf(realCallee.property.name) !== -1) {
           var strMet = realCallee.property.name;
-          // console.log(1803)
           if (match(realCallee, {
               type: 'MemberExpression',
               object: {
@@ -1803,7 +1820,6 @@ var jstiller = (function() {
                 name: strMet
               }
             }) && ret.purearg) {
-              // console.log(1816)
             value = realCallee.object.value[strMet].apply(realCallee.object.value,
               ret.arguments.map(getValue));
             return mkliteral(value);
@@ -1821,7 +1837,6 @@ var jstiller = (function() {
               name: "replace"
             }
           }) && ret.arguments[0].type === "Literal" && ret.arguments[1].type === "Literal") {
-            // console.log(1832)
           value = realCallee.object.value.replace.apply(realCallee.object.value,
             ret.arguments.map(getValue));
           return mkliteral(value);
@@ -1982,24 +1997,20 @@ var jstiller = (function() {
         }
         var calleeBody = realCallee.body ? realCallee.body : (realCallee.resolve_to ? realCallee.resolve_to.body : null);
         if (calleeBody && calleeBody.pure) {
-          // console.log("1969")
 
           if (calleeBody.body && calleeBody.body.length > 0 && calleeBody.body[calleeBody.body.length - 1].type === "ReturnStatement") {
-            // console.log("1972")
             return mkliteral(calleeBody.value);
           } else {
             calleeBody.retVal = mkliteral(calleeBody.value);
           }
         } else if ( /*EXPERIMENTAL!*/ calleeBody && calleeBody.body && calleeBody.body.length === 1 && calleeBody.body[0].argument && calleeBody.scope.hasOwnProperty("returns")
           && calleeBody.scope.returns === 1) {
+
           //TODO   We need to copy the function scope and add params values!! tmp_scope = Object.create(calleBody.scope)
           //       Copy all values.
-          // console.log("1981")
           var _callee = realCallee.params ? realCallee : (realCallee.resolve_to.params ? realCallee.resolve_to : null);
-          // console.log(_callee)
           var tmp_scope = Object.create(calleeBody.scope);
           _callee.params.map(function(p, i) {
-
             tmp_scope[p.name] = {
               value: c_arguments[i] || undefined,
               pure: false
@@ -2010,7 +2021,7 @@ var jstiller = (function() {
               value: c_arguments[i] || undefined,
               pure: false
             };
-          });
+          });          
 
           return ast_reduce(calleeBody.body[0].argument, tmp_scope, expandvars, ast);
         }
@@ -2019,7 +2030,6 @@ var jstiller = (function() {
 
         //debug("************************",ret.purearg,realCallee, realCallee.body , realCallee.callable,"************")
         if (ret.purearg && realCallee.body && (expandvars || realCallee.body.scope.closed) && realCallee.callable) {
-          // console.log("2003")
           try {
             var simple_types = ['number', 'string', 'boolean', 'undefined']
             if (realCallee.resolve_to) {
@@ -2283,6 +2293,7 @@ var jstiller = (function() {
             }
           }
         }
+
         return ret;
 
       case 'Literal':
@@ -2290,7 +2301,7 @@ var jstiller = (function() {
 
       case 'Identifier':
         debug("Identifier", ast.name, "scope", (scope), ast.name, "ExpVar?", expandvars)
-        // console.log("Identifier", ast.name, "scope", (scope), ast.name, "ExpVar?", expandvars)
+
         var isLocal = false;
         valFromScope = false;
         if (inLoop)
@@ -2318,6 +2329,7 @@ var jstiller = (function() {
           if (valFromScope.value && valFromScope.value.value)
             valFromScope.pure = valFromScope.value.pure;
         } else if (global_vars.indexOf(ast.name) !== -1 && scope.closed !== false) {
+
           scope.closed = true;
           debug(ast)
           if (ast.name === 'undefined' && ast.value === undefined) {
@@ -2334,7 +2346,6 @@ var jstiller = (function() {
           }
           
         } else { // Problem, this Ident is called for a.b.c as well as for a 
-
           if ((parent.type !== 'MemberExpression' || ast.firstObj) && scope != gscope) {
 
             debug("CLOSED!")
@@ -2350,18 +2361,18 @@ var jstiller = (function() {
           value = mkliteral(valFromScope.value);
         } else if (ast.name in scope &&
           (valFromScope.purable || valFromScope.pure_global)) {
-
           value = valFromScope.value;
 
         } else if (expandvars && (ast.name in gscope)
           && (gscope[ast.name].pure_global || gscope[ast.name].pure)) {
-
           value = mkliteral(gscope[ast.name].value);
           ast.retVal = value;
           if (typeof gscope[ast.name].value.type === "undefined")
             return value;
           else
             return ast;
+        } else if (valFromScope.value) {
+          value = valFromScope.value
         }
 
         if (expandvars && value) { //May not be enough. g.t.*e* ? on globalscope?
@@ -2989,18 +3000,16 @@ var jstiller = (function() {
 
       case 'ReturnStatement':
         debug('ReturnStatement');
-
-        // console.log('ReturnStatement');
+        console.log("Return Statment")
         if(ast.argument==null){
           return ast;
         }
-        // console.log("ReturnStatement before:", (ast.argument))
 
         value = ast_reduce(ast.argument, scope, true, ast);
         scope.returns = scope.hasOwnProperty("returns") ? ++scope.returns : 1;
 
         debug("ReturnStatement :", (value), (ast.argument))
-        // console.log("ReturnStatement :", (value), (ast.argument))
+        console.log("ReturnStatement :", (value), (ast.argument))
 
         if (value.type === 'SequenceExpression') {
           ret = {
@@ -3043,15 +3052,40 @@ var jstiller = (function() {
             type: 'ReturnStatement',
             argument: value.alternate
           };
-        } else {
+        } else if (value.type === 'BinaryExpression') {
+          ret = {
+            type: 'ReturnStatement',
+            argument: value.canPure || scope.closed ? value : ast.argument
+          };
+          ret.pure = ret.argument && (ret.argument.canPure || ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
+          
+        // }
+        } else if (value.type === 'UnaryExpression') {
+          console.log("THE RETURN STATEMENT IS A UNARY EXPRESSION IT SHOULD BE CHECKED IF ITS A PUREARG")
           ret = {
             type: 'ReturnStatement',
             argument: (value && value.pure === true) || scope.closed ? value : ast.argument
           };
-          ret.pure = ret.argument && (ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
+        // }
+        } else {
+          if (value.type === "CallExpression" && value.callee.type === "FunctionDeclaration") {
+            ret = ret = {
+              type: 'ReturnStatement',
+              // argument: (value && value.pure === true) || scope.closed ? value : ast.argument
+              argument: ast.argument
+            };
+            ret.pure = ret.argument && (ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
+          } else {
+            ret = {
+              type: 'ReturnStatement',
+              // argument: (value && value.pure === true) || scope.closed ? value : ast.argument
+              argument: value  || scope.closed ? value : ast.argument
+            };
+            ret.pure = ret.argument && (ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
+          }
+          
         }
         debug("RET PURE:", ret.pure, ret.argument === value, ret.argument === ast.argument)
-        // console.log("RET PURE:", ret.pure, ret.argument === value, ret.argument === ast.argument)
 
         return ret;
 

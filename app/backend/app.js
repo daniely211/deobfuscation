@@ -350,22 +350,10 @@ app.post('/load', function(req, res) {
   return;
 })  
 
-app.post('/pretty', function(req, res) {
-  let allDeclaredVariables = []
-  let originalCode = req.body.source
-  if (!CodeRoot || !codeCurrentParent) {
-    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
-    codeMap.set(codeTreeID, originalCode)
-    codeTreeID++
-    codeCurrentParent = CodeRoot
-  }
-  try {
-    codeRecord.push(originalCode)
-    code = RemoveCommnets(originalCode)
-    // Split all the vars declariation:
-    // console.log(code)
 
-    const ast = recast.parse(code)
+function PrettifyCode(code) {
+  let allDeclaredVariables = []
+  const ast = recast.parse(code)
     // get all function names:
     let functionNames = []
     recast.visit(ast, {
@@ -408,7 +396,25 @@ app.post('/pretty', function(req, res) {
       }
 
     });
-    let output = recast.prettyPrint(ast, { tabWidth: 4 }).code;
+    return recast.prettyPrint(ast, { tabWidth: 4 }).code;
+}
+
+app.post('/pretty', function(req, res) {
+  let originalCode = req.body.source
+  if (!CodeRoot || !codeCurrentParent) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, originalCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
+  try {
+    codeRecord.push(originalCode)
+    code = RemoveCommnets(originalCode)
+    // Split all the vars declariation:
+    // console.log(code)
+
+    const output = PrettifyCode(originalCode)
+    
     // CHECK IF THE PROCESS CAUSE ANY CHANGE
     if (originalCode === output) {
       // if the same no new record added
@@ -425,12 +431,10 @@ app.post('/pretty', function(req, res) {
     // console.log(CodeRoot)
     const treeJson = JSON.stringify(CodeRoot.model)
 
-
     res.status(200).json({
       source: output,
       codeTree: treeJson,
       codeTreeID: codeTreeID,
-      functionNames: functionNames,
     });
   } catch (e) {
     console.log(e)
@@ -534,9 +538,9 @@ app.get('/getHistory', function(req, res, next) {
   res.end()
 });
 
-// check the 2017 result is correct
-// fixing highlight in diff when code changes.
-// Symbolic replacemnet of activeXObject 
+// check the 2017 result is correct DONE!
+// fixing highlight in diff when code changes. TODO
+// TODO: SOME DONE Symbolic replacemnet of activeXObject 
 
 // Replace variable usage 
 // EG:
@@ -653,6 +657,8 @@ app.post('/constantProp', function(req, res) {
     });
     console.log("Generated Output")
     // let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
+    output = PrettifyCode(output)
+
 
     if (originalCode === output) {
       // if the same no new record added
