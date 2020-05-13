@@ -549,8 +549,12 @@ app.get('/getHistory', function(req, res, next) {
 //   return rPj;
 // }
 
-// symbolicaly save some variable states
 
+// prettify change += to = 
+// 2017, eval making into a function but scope is limited
+// eval returns something and might be used
+// eval variables need to be global
+// symbolicaly save some variable states done!
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source
   let functionNameLitMapping = new Map()
@@ -657,7 +661,11 @@ app.post('/constantProp', function(req, res) {
     });
     console.log("Generated Output")
     // let output = recast.prettyPrint(ast, { tabWidth: 2 }).code;
-    output = PrettifyCode(output)
+    try{
+      output = PrettifyCode(output)
+    } catch(e) {
+      console.log("Cannot prettify code, please manual edit the code.")
+    }
 
 
     if (originalCode === output) {

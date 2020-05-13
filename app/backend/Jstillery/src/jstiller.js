@@ -26,11 +26,12 @@
 */
 var DEBUGNAME = __filename.slice(__dirname.length + 1, -3);
 var debug = require('util').debuglog(DEBUGNAME);
+const clonedeep = require('lodash.clonedeep')
 
 var parseAst = require("esprima").parse;
 var genCode = require("escodegen").generate;
 var vm = require("vm");
-
+var isEqual = require('lodash.isequal');
 var b64 = require("./libs/b64");
 var natives = require("./native_props").natives
 require("./libs/cycle");
@@ -655,7 +656,7 @@ var jstiller = (function() {
   *Search Key in scope chain.
   returns false if not present in any scope
   else
-          {scope,value}
+          {scope,value}1
   */
   function findScope(key, scope) {
     if (!scope || scope.__proto__ === scope) {
@@ -830,8 +831,10 @@ var jstiller = (function() {
 
   //var incall=false  Added for knowing when we are in a calling state or declarative.
   let branchConditions = []
+  let taintedScope;
   var gscope = {} //Added for separating global from local.
   var scopes = [gscope];
+  let funcScope = {}
   var global_this = {
     "type": "Identifier",
     "name": "window"
@@ -872,8 +875,17 @@ var jstiller = (function() {
 
 
     //ast.__parent__=parent;
-    var ast_reduce_scoped = function(e) {
-      return ast_reduce(e, scope, expandvars, ast);
+    var ast_reduce_scoped = function(e, forcedExpand=false) {
+      let reduceScope = scope;
+      // merge the tainted scope with the current scope
+      if (taintedScope) {
+        Object.keys(taintedScope).map(p => {
+          if (scope[p]){
+            reduceScope[p].changed = taintedScope[p].changed
+          }
+        })
+      }
+      return ast_reduce(e, reduceScope, forcedExpand, ast);
     };
     // if(ast.called && ast.called_with_args){
     //   debugger;
@@ -905,8 +917,9 @@ var jstiller = (function() {
 
         left = ast_reduce_scoped(ast.left);
         right = ast_reduce_scoped(ast.right);
-        let leftPure = left.pure || left.purearg || left.canPure
-        let rightPure = right.pure || right.purearg || right.canPure
+        
+        let leftPure = left.pure || left.purearg || left.canPure || (left.retVal && left.retVal.pure)
+        let rightPure = right.pure || right.purearg || right.canPure|| (right.retVal && right.retVal.pure)
         let binPure = leftPure & rightPure
         if (!right) {
           debug("NO RIGHT!!");
@@ -920,11 +933,22 @@ var jstiller = (function() {
         if (left.pure && right.pure && ast.operator in boperators) {
           value = mkliteral(boperators[ast.operator](left.value, right.value))
           return value;
+        } else if (left.retVal && left.retVal.pure && right.retVal && right.retVal.pure && ast.operator in boperators) {
+          // it can be evaluted BUT DONT REDUCE!
+          value = mkliteral(boperators[ast.operator](left.retVal.value, right.retVal.value))
+          return {
+            type: ast.type,
+            operator: ast.operator,
+            left: left ? left : ast.left,
+            right: right ? right : ast.right,
+            canPure: binPure,
+            retVal: value
+          };
         } else {
           if (parent.type !== "ForStatement") { //nested Expr
-            if (left.retVal)
+            if (left.retVal && left.retVal.pure)
               left = left.retVal
-            if (right.retVal)
+            if (right.retVal && right.retVal.pure)
               right = right.retVal;
           }
           // 
@@ -1143,9 +1167,16 @@ var jstiller = (function() {
         if(ast.expression.type === 'ConditionalExpression'){
           ast.expression.canbetransformed = true;
         }
+        let exprReduced =  ast_reduce_scoped(ast.expression)
+        if (exprReduced.type === 'BlockStatement') {
+          return {
+            type: exprReduced.type,
+            body: exprReduced.body
+          }
+        }
         ret = {
           type: ast.type,
-          expression: ast_reduce_scoped(ast.expression)
+          expression: exprReduced
         };
         ret.pure = ret.expression.pure;
         if (ret.expression.expanded) //if expanded property is set to true when we expand Function or eval
@@ -1189,8 +1220,7 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
           operator: ast.operator,
-          // left: ast_reduce(ast.left, scope, false, ast),
-          left: ast.left,
+          left: ast_reduce(ast.left, scope, false, ast),
           right: ast_reduce_scoped(ast.right)
         };
         debug("OPERATION: AssignmentExpression", parent, (ret))
@@ -1354,6 +1384,7 @@ var jstiller = (function() {
             // Set the variable to be changed so when next time its used, dont propagate the constnat.
             valFromScope.changed = true;
             // console.log("Identifier and in Scope", ret, parent)
+
             if (ret.retVal) {
               // not in a branch
               // console.log("######################## BRANCH CONDITION ATM")
@@ -1449,8 +1480,6 @@ var jstiller = (function() {
           arguments: ast.arguments,
           callee: ast.callee
         };
-        console.log("Call expr")
-        console.log(ast)
         var realCallee = ast.callee
         if (ast.callee.type === 'SequenceExpression') {
           // is a comma separated sequence, we need to reduce everything
@@ -1458,14 +1487,14 @@ var jstiller = (function() {
           // the supposed function that will be called
           _tmp = {
             type: 'SequenceExpression',
-            expressions: ast.callee.expressions.map(ast_reduce_scoped)
+            expressions: ast.callee.expressions.map(e => ast_reduce_scoped(e, true))
           }
           //ret.callee = ast.callee.expressions.slice(-1);
           var realCallee = _tmp.expressions.slice(-1)[0];
         }
 
         realCallee.called = true;
-        var c_arguments = ast.arguments.map(ast_reduce_scoped);
+        var c_arguments = ast.arguments.map(a => ast_reduce_scoped(a, true));
         realCallee.called_with_args = c_arguments;
         ret.arguments = c_arguments;
         /*ret = {
@@ -1483,7 +1512,6 @@ var jstiller = (function() {
 
         ret.purearg = ret.arguments.every(function(e) {
           //solve 
-
           if (e.type === 'Identifier' && e.name in scope) {
             valScope = findScope(e.name, scope);
             return valScope && valScope.value && valScope.value.value && valScope.value.value.pure;
@@ -1515,9 +1543,7 @@ var jstiller = (function() {
             && realCallee.body.body[realCallee.body.body.length - 1].type === "ReturnStatement";
         }
         if (realCallee.type === "MemberExpression") {
-          console.log("member ")
           value = resolveMemberExpression(realCallee, scope, true);
-          console.log(value)
           if (value.resolved) {
             if (value.isGlobal && value.proparr.length === 0) {
               value = value.resolved;
@@ -1559,10 +1585,8 @@ var jstiller = (function() {
           //Look for declared function and see if the scope is closed.
 
           valScope = findScope(realCallee.name, scope);
-
           if (valScope && valScope.value.value) {
             valFromScope = valScope.value.value;
-
             valScope = valScope.scope;
 
             if (valFromScope.body && valFromScope.body.scope && (valFromScope.body.scope.closed || !valFromScope.body.scope.externalWrite)) {
@@ -1570,7 +1594,7 @@ var jstiller = (function() {
               realCallee.callable = true;
               realCallee.resolve_to = valFromScope
 
-            } else if (valFromScope.type === 'MemberExpression' || valFromScope.type === 'Identifier') {
+            } else if (valFromScope.type === 'MemberExpression' || valFromScope.type === 'Identifier' ) {
               ret.callee = realCallee = valFromScope;
               if (_tmp) {
                 _tmp.expressions[_tmp.expressions.length - 1] = realCallee;
@@ -1970,31 +1994,6 @@ var jstiller = (function() {
           return ret;
         }
 
-        //
-        if (realCallee.type === "Identifier") {
-          // console.log("Identifier 1965")
-          valFromScope = findScope(realCallee.name, scope);
-          if (valFromScope && valFromScope.value && valFromScope.value.value) {
-            if ((valFromScope.value.value.type === 'FunctionExpression' || valFromScope.value.value.type === 'FunctionDeclaration')
-              && !valFromScope.value.value.alreadyReduced) {
-              // console.log("AST Reduced")
-              value = ast_reduce_scoped(valFromScope.value.value);
-              // console.log(value)
-            } else {
-              value = valFromScope.value.value;
-              // console.log("Not val from scope")
-              // console.log(value)
-            }
-
-            if (value.body && value.body.pure) {
-              ret.callee = realCallee = value;
-              if (_tmp) {
-                _tmp.expressions[_tmp.expressions.length - 1] = realCallee;
-                ret.callee = _tmp;
-              }
-            }
-          }
-        }
         var calleeBody = realCallee.body ? realCallee.body : (realCallee.resolve_to ? realCallee.resolve_to.body : null);
         if (calleeBody && calleeBody.pure) {
 
@@ -2025,6 +2024,124 @@ var jstiller = (function() {
 
           return ast_reduce(calleeBody.body[0].argument, tmp_scope, expandvars, ast);
         }
+
+        //
+        if (realCallee.type === "Identifier") {
+          valFromScope = findScope(realCallee.name, scope);
+          if (funcScope[realCallee.name]) {
+            // check for each of those entries, see if they containt the same a params as before.
+            let pastCalls =  funcScope[realCallee.name]
+            pastCalls.forEach(call => {
+              if (isEqual(call.params, c_arguments)) {
+                return mkliteral(call.value)
+              }
+            })
+          }
+          if (valFromScope && valFromScope.value && valFromScope.value.value) {
+            if (valFromScope.value.value.type === 'FunctionExpression' || valFromScope.value.value.type === 'FunctionDeclaration') {
+              if (!valFromScope.value.value.alreadyReduced) {
+                value = ast_reduce_scoped(valFromScope.value.value);  
+              }
+              if (valFromScope.value.value.body && valFromScope.value.value.body.body) {
+                // check if this function returns something...
+                // if nothing gets returned then just return ast
+                let functionBodies = valFromScope.value.value.body.body;
+                let hasReturn = functionBodies.filter(function(e) {
+                  return e.type === 'ReturnStatement';
+                }).length > 0;
+                if (hasReturn) {
+                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
+                    // the same number of arguments called
+                    valFromScope.value.value.params.map((p , i) => {
+                      scope[p.name] = {
+                        value: c_arguments[i],
+                        pure: c_arguments[i].pure,
+                        isParam: true
+                      }
+                    })
+                  }
+                  // check if we have evaluated before, check in the scope
+                  let funcbody = valFromScope.value.value.body
+                  funcbody.pure = true
+                  value = ast_reduce_scoped(funcbody);
+                  // this will be the return value of the function call
+                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
+                    // the same number of arguments called
+                    valFromScope.value.value.params.map((p , i) => {
+                      if (scope[p.name].isParam) {
+                        delete scope[p.name]
+                      }
+                    })
+                  }
+                  // remove all the params
+                  if (value.pure) {
+                    if (!funcScope[realCallee.name]) {
+                      funcScope[realCallee.name] = []
+                    }
+                    funcScope[realCallee.name].push({
+                      param: c_arguments,
+                      value: value
+                    })
+                    
+                    return mkliteral(value.value);
+                  } else if (value.body){
+                    let lastBody = value.body[value.body.length -1]
+                    if (lastBody.type === 'ReturnStatement' && lastBody.pure) {
+                      funcScope[realCallee.name] = value.value
+                      return mkliteral(lastBody.argument.value);
+                    }
+                  } else {
+                    // cannot be reduced purely
+                    return ast
+                  }
+                } else {
+                  // it doesnt have a return so lets see if we can just inline the function
+                  // check if parent you are in assignment if it is, do NOT replace
+                  //
+                  if (parent.type !== 'ExpressionStatement') {
+                    return ast
+                  }
+                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
+                    // the same number of arguments called
+                    valFromScope.value.value.params.map((p , i) => {
+                      scope[p.name] = {
+                        value: c_arguments[i],
+                        pure: c_arguments[i].pure,
+                        isParam: true
+                      }
+                    })
+                  }
+
+                  let funcbody = valFromScope.value.value.body
+                  funcbody.pure = true
+                  let reducedBody = ast_reduce_scoped(funcbody);
+                  
+                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
+                    // the same number of arguments called
+                    valFromScope.value.value.params.map((p , i) => {
+                      if (scope[p.name].isParam) {
+                        delete scope[p.name]
+                      }
+                    })
+                  }
+                  return reducedBody // need to change
+                }
+              }
+              // Here they need to bind the arguments
+            } else {
+              value = valFromScope.value.value;
+            }
+
+            if (value && value.body && value.body.pure) {
+              ret.callee = realCallee = value;
+              if (_tmp) {
+                _tmp.expressions[_tmp.expressions.length - 1] = realCallee;
+                ret.callee = _tmp;
+              }
+            }
+          }
+        }
+        
         //Has body or resolve_to with body and has only return statement
         ret.callee = realCallee
 
@@ -2306,7 +2423,6 @@ var jstiller = (function() {
         valFromScope = false;
         if (inLoop)
           return ast;
-
         if (ast.name in scope) {
           //BUG WARNING: on MemberExpr. when local var has same name. we may have probl
           // TODO: find a workaround: var f={h:3}; function s(){   var t=3; f.t=2; /*f.*t* same name t.*/ }
@@ -2321,11 +2437,11 @@ var jstiller = (function() {
           }
           if (valFromScope.scope !== scope) {
             scope.closed = false;
-
             if ((parent.type !== 'MemberExpression' || ast.firstObj) && scope.externalRefs.indexOf(ast) === -1)
               scope.externalRefs.push(ast);
           }
           valFromScope = valFromScope.value || {};
+        
           if (valFromScope.value && valFromScope.value.value)
             valFromScope.pure = valFromScope.value.pure;
         } else if (global_vars.indexOf(ast.name) !== -1 && scope.closed !== false) {
@@ -2347,7 +2463,6 @@ var jstiller = (function() {
           
         } else { // Problem, this Ident is called for a.b.c as well as for a 
           if ((parent.type !== 'MemberExpression' || ast.firstObj) && scope != gscope) {
-
             debug("CLOSED!")
             scope.closed = false;
             // Not Found!! Still we want to add externalRefs.
@@ -2375,9 +2490,15 @@ var jstiller = (function() {
           value = valFromScope.value
         }
 
-        if (expandvars && value) { //May not be enough. g.t.*e* ? on globalscope?
+        if (value && value.type === 'NewExpression') {
+          // new expressions dont return a new one becuase of the side effects
+          return ast
+        }
+        
+        if (expandvars && value) { //May not be enough. g.t.*e* ? on globalscope?         
           return value;
         } else {
+          
           if (value) {
             ast.retVal = value;
             ast.retVal.isLocal = isLocal;
@@ -2454,7 +2575,7 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
           computed: ast.computed, // true if :object["test"] or object[test] false if ob.test
-          object: ast_reduce_scoped(ast.object),
+          object: ast_reduce_scoped(ast.object, true),
           // do not expand identifiers as variables if they are not in square brackets
           property: ast.computed ?
             //Error, if computed is true, should expand to be true ?! 
@@ -2528,7 +2649,12 @@ var jstiller = (function() {
           debug("ArrayExpression a[1]", ret.object.elements, ret.property.value, ret.object.elements[ret.property.value]);
 
           value = ret.object.elements[ret.property.value];
+          if (!value) {
+            // the return is undefined
+            return ast
+          }
           ret.object = _tretObj;
+
           if (typeof value !== 'object')
             return mkliteral(value);
           else
@@ -2721,7 +2847,6 @@ var jstiller = (function() {
         };
         var _scopeVal = ret.init;
         debug("VariableDeclarator::", _scopeVal)
-
         if (ret.init && ret.init.retVal)
           _scopeVal = ret.init.retVal
 
@@ -2732,7 +2857,7 @@ var jstiller = (function() {
         if (_scopeVal && _scopeVal.pure) {
           set_scope(scope, ast.id.name, {
             value: _scopeVal.value,
-            pure: true
+            pure: true,
           });
         } else if (_scopeVal && _scopeVal.type === "Identifier" && global_vars.indexOf(_scopeVal.name) !== -1) {
           set_scope(scope, ast.id.name, {
@@ -2742,12 +2867,12 @@ var jstiller = (function() {
         } else if (_scopeVal && _scopeVal.type === "ArrayExpression") {
           set_scope(scope, ast.id.name, {
             value: _scopeVal,
-            purable: true
+            purable: true,
           });
         } else if (_scopeVal && _scopeVal.type === "UnaryExpression" && _scopeVal.argument.pure) {
           set_scope(scope, ast.id.name, {
             value: _scopeVal.value,
-            pure: true
+            pure: true,
           });
         } else if (_scopeVal && _scopeVal.type === "ObjectExpression") { // VariableDeclarator
 
@@ -2758,7 +2883,7 @@ var jstiller = (function() {
           scope[OBJECTS_NAME].push(_scopeVal);
           set_scope(scope, ast.id.name, {
             value: _scopeVal,
-            pure: false
+            pure: false,
           });
 
         } else if (_scopeVal && _scopeVal.type === "MemberExpression") { // VariableDeclarator
@@ -2774,7 +2899,7 @@ var jstiller = (function() {
           if (!_sval) {
             set_scope(scope, ast.id.name, {
               value: _scopeVal,
-              pure: false
+              pure: false,
             });
             return ret;
           } else if (_sval.pure_global) {
@@ -2830,19 +2955,19 @@ var jstiller = (function() {
           } else if (_lval.last_resolved) {
             ret.init = mkliteral({
               "type": "Identifier",
-              "name": "undefined"
+              "name": "undefined",
             });
           }
 
           set_scope(scope, ast.id.name, {
             value: ret.init,
-            pure: false
+            pure: false,
           });
 
         } else {
           set_scope(scope, ast.id.name, {
             value: _scopeVal,
-            pure: false
+            pure: false,
           });
 
         }
@@ -2962,11 +3087,25 @@ var jstiller = (function() {
 
 
       case 'BlockStatement':
+        // let pastConditions = branchConditions;
+        
         ret = {
           type: ast.type,
-          body: ast.body.map(ast_reduce_scoped)
         };
+        let RetBody = ast.body.map(ast_reduce_scoped)
+        let RetFlattenBody = []
+        RetBody.forEach(expr => {
+          if (expr.type === 'BlockStatement') {
+            expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+          } else {
+            RetFlattenBody.push(expr)
+          }
+        })
+        // reduce any new call expr statment that are converted to function body type
+        ret.body = RetFlattenBody
+        // branchConditions = pastConditions
         last = ret.body && ret.body.length > 0 && ret.body[ret.body.length - 1];
+        // if there is an if statemnet, it is pure if the test can be evaluated
         pure = ret.body && ret.body.every(function(e) {
           return e.pure;
         });
@@ -3000,7 +3139,6 @@ var jstiller = (function() {
 
       case 'ReturnStatement':
         debug('ReturnStatement');
-        console.log("Return Statment")
         if(ast.argument==null){
           return ast;
         }
@@ -3009,7 +3147,6 @@ var jstiller = (function() {
         scope.returns = scope.hasOwnProperty("returns") ? ++scope.returns : 1;
 
         debug("ReturnStatement :", (value), (ast.argument))
-        console.log("ReturnStatement :", (value), (ast.argument))
 
         if (value.type === 'SequenceExpression') {
           ret = {
@@ -3091,48 +3228,87 @@ var jstiller = (function() {
 
 
       case 'IfStatement':
-        // console.log("Evaluating if statement")
-        // console.log(ast)
-        // console.log(ast.test)
-        // TODO the scope of consequent and alternate is not the same cannot affect each other....
         let testReduced = ast_reduce_scoped(ast.test)
         // console.log("######PUSHING BRANCH CONDITION")
-        branchConditions.push(testReduced)
-        // console.log(branchConditions)
-        let consequentReduced = ast_reduce_scoped(ast.consequent)
-        // console.log("######POPING BRANCH CONDITION")
-        branchConditions.pop()
-        let negatedTest = {
-          type: "UnaryExpression",
-          operator: "!",
-          prefix: true,
-          argument: testReduced
+        let consequentReduced;
+        let alternateReduced;
+        let scopeBeforeReduce;
+        if (testReduced.canPure) {
+          let testResult;
+          if (testReduced.value) {
+            branchConditions.push(testReduced.value)
+            testResult = testReduced.value
+          } else if (testReduced.retVal) {
+            branchConditions.push(testReduced.retVal)
+            testResult = testReduced.retVal.value
+          } else {
+            console.log("This is an error, if it can be pure but no test result...")
+          }
+
+          // if the test can be reduce then keep one of the scope
+
+          if (testResult) {
+            // the test is positive just, reduce the alternative and then the consequent 
+            scopeBeforeReduce = clonedeep(scope)
+            alternateReduced = ast_reduce_scoped(ast.alternate)
+            scope = clonedeep(scopeBeforeReduce)
+            consequentReduced = ast_reduce_scoped(ast.consequent)
+          } else {
+            scopeBeforeReduce = clonedeep(scope)
+            consequentReduced = ast_reduce_scoped(ast.consequent)
+            scope = clonedeep(scopeBeforeReduce)
+            alternateReduced = ast_reduce_scoped(ast.alternate)
+          }
+          
+        } else if (testReduced.pure) {
+          // the test is true or false just, reduce the alternative and then the consequent 
+          if (testReduced.value) {
+            return ast_reduce_scoped(ast.consequent)
+          } else {
+            return ast_reduce_scoped(ast.alternate)
+          }         
+        } else {
+          // we cant tell if it is, just reduce both and then return it
+          // We also have to remove all the variables that re-assigned or defined in both those scopes
+          branchConditions.push(testReduced)
+          scopeBeforeReduce = clonedeep(scope)
+          // the alt needs a fresh scope that assumes that the consequent was NOT reduced,
+          let scopeBeforeReduceAlt = clonedeep(scope)
+
+          consequentReduced = ast_reduce_scoped(ast.consequent)
+          Object.keys(scope).map(k => {
+            if (scopeBeforeReduce[k]) {
+              // this reference also existed in previous scope lets check if the value changed
+              let prevScopeVal = scopeBeforeReduce[k].value
+              let newScopeVal = scope[k].value
+              if (!isEqual(prevScopeVal, newScopeVal)) {
+                scopeBeforeReduce[k].changed = true
+              }
+            }
+          })
+          scope = clonedeep(scopeBeforeReduceAlt)
+          alternateReduced = ast_reduce_scoped(ast.alternate)
+          Object.keys(scope).map(k => {
+            if (scopeBeforeReduce[k]) {
+              // this reference also existed in previous scope lets check if the value changed
+              let prevScopeVal = scopeBeforeReduce[k]
+              let newScopeVal = scope[k]
+              if (!isEqual(prevScopeVal, newScopeVal)) {
+                // the value changed in the reduced scope, lets mark it as tainted so whenever the scope uses this value, dont reduce it
+                scopeBeforeReduce[k].changed = true
+              }
+            }
+          })
+          taintedScope = clonedeep(scopeBeforeReduce)
         }
-        // console.log("######PUSHING BRANCH CONDITION")
-        branchConditions.push(ast_reduce_scoped(negatedTest))
-        // console.log(branchConditions)
-
-        let alternateReduced = ast_reduce_scoped(ast.alternate)
-        // console.log("######POPING BRANCH CONDITION")
-        branchConditions.pop()
-
+       
         ret = {
           type: 'IfStatement',
-          test: ast.test, //Expand or Not?Lookahead?
+          test: testReduced, //Expand or Not?Lookahead?
           consequent: consequentReduced,
-          alternate: alternateReduced
+          alternate: alternateReduced,
+          pure: testReduced.canPure || testReduced.pure
         };
-        // console.log("The full version")
-        // console.log(ret)
-        // console.log(ret.test)
-        if (ret.test.pure) {
-          if (ret.test.value && ret.consequent.pure) {
-            return ret.consequent;
-          }
-          if (!ret.test.value && ret.alternate && ret.alternate.pure) {
-            return ret.alternate;
-          }
-        }
         return ret;
 
 
@@ -3188,7 +3364,7 @@ var jstiller = (function() {
         debug("This Exp!", ast, scope);
         scope['.uses_this'] = true;
         //is in Function? isGlobal? is Binded? 
-        /**
+        /** 
          * Returns the "this Object".
          * @param  {[type]} scope [description]
          * @return {[type]}       [description]
@@ -3201,19 +3377,43 @@ var jstiller = (function() {
           };
 
       case 'ConditionalExpression': // a?b:c
+        let test = ast_reduce_scoped(ast.test) //Expand or Not? Lookahead?
         ret = {
           type: ast.type,
           canbetransformed: ast.canbetransformed || parent.canbetransformed,
-          test: ast_reduce_scoped(ast.test), //Expand or Not? Lookahead?
-          consequent: ast_reduce_scoped(ast.consequent),
-          alternate: ast_reduce_scoped(ast.alternate)
+          test: test, //Expand or Not? Lookahead?
         };
 
-        // if this ternary operator is standalone, we might want to expand it as a if then else
         if ((parent.type === 'ExpressionStatement' && ast === parent.expression )
+        // OR is the child of another ConditionalExpression 
           // OR is the child of another ConditionalExpression 
-            || (parent.type === 'ConditionalExpression' && ast !== parent.test && ret.canbetransformed)
-          ) {
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          // OR is the child of another ConditionalExpression 
+        // OR is the child of another ConditionalExpression 
+          || (parent.type === 'ConditionalExpression' && ast !== parent.test && ret.canbetransformed)
+        ) {
           ret.type = 'IfStatement';
         } else {
           ret.type = ast.type;
@@ -3231,8 +3431,8 @@ var jstiller = (function() {
       case 'NewExpression':
         ret = {
           type: ast.type,
-          callee: ast_reduce_scoped(ast.callee),
-          arguments: ast.arguments.map(ast_reduce_scoped)
+          callee: ast_reduce_scoped(ast.callee, true),
+          arguments: ast.arguments.map(e => ast_reduce_scoped(e, true))
         };
         ret.purearg = ret.arguments.every(function(e) {
           return e.pure || e.simpleType;

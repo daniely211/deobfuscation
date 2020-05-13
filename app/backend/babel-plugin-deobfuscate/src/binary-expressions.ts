@@ -6,13 +6,32 @@ export function evaluate (path): t.Expression {
   path.assertBinary()
 
   let { operator, left, right } = path.node
+  // check if either left or right is a identifier 
+  if (left.type ==='Identifer' || right.type === 'Identifier'){
+    // now check if either of them are a param in a function, then dont evaluate fully
+    let leftName = left.name
+    let rightName = right.name
+    let scope = path.scope
+    let leftBinding = scope.binding[leftName]
+    let rightBinding = scope.binding[rightName]
+    if (leftBinding && leftBinding.kind === 'param') {
+      // its in the scope binding, if its a param then just return the ast
+      return path.node
+    }
+    if (rightBinding && rightBinding.kind === 'param') {
+      // its in the scope binding, if its a param then just return the ast
+      return path.node
+    }
 
+  } 
+  
   if (!u.hasValue(left)) {
     left = evaluateExpression(path.get('left'))
   }
   if (!u.hasValue(right)) {
     right = evaluateExpression(path.get('right'))
   }
+
 
   if (t.isBinaryExpression(left) && u.hasValue(left.right) && u.hasValue(right)) {
     if (left.operator === operator && isAssociative(operator)) {
