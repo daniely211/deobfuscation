@@ -21,11 +21,12 @@ var TreeModel = require('tree-model')
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
 const deobfuscatePlugin = require('./babel-plugin-deobfuscate')
+const removeUnused = require('babel-plugin-remove-unused-vars')
 const babelCore = require('babel-core')
 const prettier = require('prettier')
 const commentRemover = require('./commentRemover')
 const fs = require('fs')
-function illuminateformat (code) {
+function babelFormat (code) {
   return prettier.format(code)
     .split('\n')
     .filter(line => line !== '')
@@ -33,8 +34,12 @@ function illuminateformat (code) {
 }
 const generatorOpts = { compact: false }
 
-function illuminateDeobfuscate (code) {
-  return illuminateformat(babelCore.transform(code, { plugins: [ deobfuscatePlugin ], ast: false, generatorOpts }).code)
+function illuminateDeobfuscate(code) {
+  return babelFormat(babelCore.transform(code, { plugins: [ deobfuscatePlugin ], ast: false, generatorOpts }).code)
+}
+
+function removeUnusedVariablesBabel(code) {
+  return babelFormat(babelCore.transform(code, { plugins: [ removeUnused ], ast: false, generatorOpts }).code)
 }
 
 tree = new TreeModel()
@@ -60,12 +65,44 @@ function RemoveCommnets(code) {
 function removeUnusedVariables(code) {
   // Need to remove all unused variable declaration
   // console.log("Removing Unused variables with Putout")
-  const removedUnused = putout(code, {
-    plugins: [
-        'remove-unused-variables'
-    ]
+  // const removedUnused = putout(code, {
+  //   plugins: [
+  //       'remove-unused-variables'
+  //   ]
+  // });
+  // return removedUnused.code
+  return removeUnusedVariablesBabel(code)
+}
+
+function removeUnusedFunctionsDeclarations(code) {
+  var ast = esprima.parse(code);
+  var functionsDeclaredCallMap = new Map()
+  recast.visit(ast, {
+    visitFunctionDeclaration(path) {
+      var node = path.node;
+      let functionName = node.id.name
+      // all functions that simply return a literal inline them
+      if (!functionsDeclaredCallMap.get(functionName)) {
+        functionsDeclaredCallMap.set(functionName, false)
+      }
+      this.traverse(path);
+    },
+    visitCallExpression(path) {
+      let node = path.node
+      let callee = node.callee
+      if (n.Identifier.check(callee)){
+        const calleeName = callee.name
+        functionsDeclaredCallMap.set(calleeName, true)
+      }
+      this.traverse(path);
+    }
   });
-  return removedUnused.code
+  let newBody = ast.body.filter(expr => expr.type === 'FunctionDeclaration' && functionsDeclaredCallMap.get(expr.id.name))
+  ast.body = newBody
+  var output = escodegen.generate(ast, {
+    comment: false
+  });
+  return output
 }
 
 app.get('/clearHistory', function(req, res, next) {
@@ -488,6 +525,53 @@ app.post('/unused', function(req, res) {
   return;
 });
 
+app.post('/unusedFunctions', function(req, res) {
+  const originalCode = req.body.source
+  if (!CodeRoot) {
+    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
+    codeMap.set(codeTreeID, originalCode)
+    codeTreeID++
+    codeCurrentParent = CodeRoot
+  }
+
+  try {
+    codeRecord.push(originalCode)
+    let output = removeUnusedFunctionsDeclarations(originalCode)
+
+    try{
+      output = PrettifyCode(output)
+    } catch(e) {
+      console.log("Cannot prettify code, please manual edit the code.")
+    }
+    
+    if (originalCode === output) {
+      // if the same no new record added
+      codeRecord.pop()
+    } else {
+      // Theres something new!!
+      // update the code tree with the current parent
+      const newChild = tree.parse({id: codeTreeID, label:"unused Func"})
+      codeMap.set(codeTreeID, output)
+      codeTreeID++
+      codeCurrentParent = codeCurrentParent.addChild(newChild)
+    }
+    const treeJson = JSON.stringify(CodeRoot.model)
+
+    res.status(200);
+    res.json({
+      source: output,
+      codeTree: treeJson,
+      codeTreeID: codeTreeID,
+    });
+  } catch (e) {
+    res.json({
+      error: e
+    })
+  }
+  res.end();
+  return;
+});
+
 app.post('/getNode', function(req, res) {
   let newID = req.body.newId
   let diff = req.body.diff
@@ -538,23 +622,6 @@ app.get('/getHistory', function(req, res, next) {
   res.end()
 });
 
-// check the 2017 result is correct DONE!
-// fixing highlight in diff when code changes. TODO
-// TODO: SOME DONE Symbolic replacemnet of activeXObject 
-
-// Replace variable usage 
-// EG:
-// function qBE(aDt) {
-//   const rPj = aDt.GetSpecialFolder(2) + "\\" + aDt.GetTempName();
-//   return rPj;
-// }
-
-
-// prettify change += to = 
-// 2017, eval making into a function but scope is limited
-// eval returns something and might be used
-// eval variables need to be global
-// symbolicaly save some variable states done!
 app.post('/constantProp', function(req, res) {
   let originalCode = req.body.source
   let functionNameLitMapping = new Map()
@@ -597,6 +664,13 @@ app.post('/constantProp', function(req, res) {
               const literalstmt =  lastStatement.argument
               functionNameLitMapping.set(functionName, literalstmt.value)
             }
+            if (n.Identifier.check(lastStatement.argument)) {
+              // it returns a literal, now i replace all function calls to this literal
+              const identifier =  lastStatement.argument
+              if (identifier.name === 'ActiveXObject') {
+                functionNameLitMapping.set(functionName, identifier.name)
+              }
+            }
           }
         }
         this.traverse(path);
@@ -606,7 +680,6 @@ app.post('/constantProp', function(req, res) {
     if (functionNameLitMapping.size > 0) {
       // we found some functions that just return a literal
       // now we go through all the calls to functions that has the name in function lit mapping and replace it with a literal
-
       recast.visit(ast, {
         // check for all call expression
 
@@ -617,12 +690,17 @@ app.post('/constantProp', function(req, res) {
             const calleeName = callee.name
             if (functionNameLitMapping.get(calleeName)) {
               const litVal = functionNameLitMapping.get(calleeName)
-              // node replace
-              // const literalNode = b.literal(litVal)
-              node.type = "Literal"
-              delete node.callee
-              node.value = litVal
-              delete node.arguments
+              if (litVal === 'ActiveXObject') {
+                node.type = "Identifier"
+                delete node.callee
+                node.name = litVal
+                delete node.arguments
+              } else {
+                node.type = "Literal"
+                delete node.callee
+                node.value = litVal
+                delete node.arguments
+              }              
             }
           }
           this.traverse(path);

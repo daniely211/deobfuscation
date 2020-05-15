@@ -26,7 +26,6 @@ export function deobfuscateExpression (path) {
 }
 
 export function evaluateExpression (path): t.Expression {
-  path.assertExpression()
   const evaluate = evaluator(path)
   return evaluate(path) || path.node
 }

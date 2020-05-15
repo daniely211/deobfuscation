@@ -75,11 +75,6 @@ function evaluateInit(path, binding) {
         return null;
     }
     var init = binding.path.get('init');
-    // if (!init.type) {
-    //     console.log("init type is empty")
-    //     console.log(path.node.type)
-    //     return path.node
-    // }
     return expressions_1.evaluateExpression(init);
 }
 /** This occurs bindings are shadowed and is required to break infinite recursion. */

@@ -1159,8 +1159,20 @@ var jstiller = (function() {
       case 'Program':
         ret = {
           type: ast.type,
-          body: ast.body.map(ast_reduce_scoped)
         };
+        let bodyReduced = ast.body.map(ast_reduce_scoped)
+        let progBody = []
+        bodyReduced.forEach(expr => {
+          if (expr.type === 'VariableDeclaration' && expr.declarations &&
+          expr.declarations[0].eval) {
+            let varDeclarator = expr.declarations[0]
+            varDeclarator.body.forEach(ex => {progBody.push(ex)})
+            progBody.push(expr)
+          } else {
+            progBody.push(expr)
+          }
+        })
+        ret.body = progBody
         return ret;
 
       case 'ExpressionStatement':
@@ -1666,9 +1678,9 @@ var jstiller = (function() {
         // eval
         // Experimental eval to AST!!!
         if (match(realCallee, {
-            type: 'Identifier',
-            name: 'eval'
-          }) && ret.purearg) {
+          type: 'Identifier',
+          name: 'eval'
+        }) && ret.purearg) {
           value = ret.arguments[ret.arguments.length - 1];
           if (value.length === 0) {
             return ret;
@@ -1687,8 +1699,21 @@ var jstiller = (function() {
             }
             else if(_functionast.body.length === 0){
               return mkliteral(undefined);
-            }
-            else
+            } else {
+              if (parent.type === 'VariableDeclarator') {
+                let evalResBody = _functionast.body;
+                let lastExpr = evalResBody[evalResBody.length - 1]
+                if (lastExpr.expression && lastExpr.expression.type === 'AssignmentExpression') {
+                  let lastLeft = lastExpr.expression.left
+                  if (lastLeft.type === 'Identifier') {
+                    return {
+                      type: 'eval',
+                      iden: lastLeft,
+                      body: evalResBody
+                    }
+                  }
+                }
+              }
               return { //eval is peculiar, it should be very thoroughly how and when expand it
                 "type": "ExpressionStatement",
                 "expression": {
@@ -1696,7 +1721,8 @@ var jstiller = (function() {
                   body: _functionast.body
                 },
                 "expanded": true
-            }
+              }
+            }             
           } catch (exc) {
             debug("Eval : ", exc)
           }
@@ -2046,6 +2072,11 @@ var jstiller = (function() {
                 // check if this function returns something...
                 // if nothing gets returned then just return ast
                 let functionBodies = valFromScope.value.value.body.body;
+                // if (functionBodies.length > 20) {
+                //   // the function is too big to just reduce,
+                //   // TODO ACTUALLY FIGURE OUT IF ITS PURE...
+                //   return ast
+                // }
                 let hasReturn = functionBodies.filter(function(e) {
                   return e.type === 'ReturnStatement';
                 }).length > 0;
@@ -2843,8 +2874,17 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
           id: ast_reduce_scoped(ast.id),
-          init: ast_reduce_scoped(ast.init)
         };
+        let init = ast_reduce_scoped(ast.init)
+        if (init && init.type === 'eval') {
+          ret.init = init.iden
+          ret.body = init.body
+          ret.eval = true
+          return ret
+        }
+
+        ret.init = init
+
         var _scopeVal = ret.init;
         debug("VariableDeclarator::", _scopeVal)
         if (ret.init && ret.init.retVal)
@@ -3097,6 +3137,9 @@ var jstiller = (function() {
         RetBody.forEach(expr => {
           if (expr.type === 'BlockStatement') {
             expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+          } else if (expr.eval) {
+            expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+            RetFlattenBody.push(expr)
           } else {
             RetFlattenBody.push(expr)
           }
