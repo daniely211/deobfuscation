@@ -1,43 +1,43 @@
-// const initCode = `
-// var lyB = jQX(7, 4);
-// var lyB2 = jQX(23, 56);
+const initCode = `
+var lyB = jQX(7, 4);
+var lyB2 = jQX(23, 56);
 
-// function jQX(ea, b) {
-//     var K = 24;
-// 	var k2 = 30;
-//   	var k3 = 10
-//     if (ea > b){
-//       K = 2;
-//   	  k2 = 20
-//     } else {
-//       k3 = k2 + 10
-//       K = 3;
-//     }
+function jQX(ea, b) {
+    var K = 24;
+	var k2 = 30;
+  	var k3 = 10
+    if (ea > b){
+      K = 2;
+  	  k2 = 20
+    } else {
+      k3 = k2 + 10
+      K = 3;
+    }
      
   
-//   	var x = 2 + k2
-//     var y = 4 + k3
+  	var x = 2 + k2
+    var y = 4 + k3
 
-//     return K;
-// }
-// // this example shows K is tainted in the if branch so then unless there is a solid assignment it will not be evaluated as 
-// `
-
-const initCode = `
-function R(K) {
-    C(oL, T("deleteF"));
+    return K;
 }
-
-function T(gR) {
-    return gR + "ile";
-}
-
-function C(u, Flg) {
-    const ffv = WScript;
-    u[Flg](WScript.ScriptFullName);
-}
-
+// this example shows K is tainted in the if branch so then unless there is a solid assignment it will not be evaluated as 
 `
+
+// const initCode = `
+// function R(K) {
+//     C(oL, T("deleteF"));
+// }
+
+// function T(gR) {
+//     return gR + "ile";
+// }
+
+// function C(u, Flg) {
+//     const ffv = WScript;
+//     u[Flg](WScript.ScriptFullName);
+// }
+
+// `
 
 
 // const initCode = `
