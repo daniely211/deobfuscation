@@ -38,7 +38,7 @@ function transformVariableDeclaration(node, scope) {
         if (t.isIdentifier(declarator.id)) {
             var binding = scope.getBinding(declarator.id.name);
             if (binding && binding.constant && declarator.init) {
-                return t.variableDeclaration('const', [declarator]);
+                return t.variableDeclaration('var', [declarator]);
             }
         }
         return t.variableDeclaration('var', [declarator]);

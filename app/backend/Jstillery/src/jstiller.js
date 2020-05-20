@@ -39,6 +39,34 @@ var collectHTMLData = require("./libs/htmlParse").collectHTMLData
 
 var USE_PARTIAL = typeof process.env.USE_PARTIAL !== 'undefined' ? process.env.USE_PARTIAL : true;
 
+function removeReturnNode (expr) {
+  if (!expr) {
+    return expr
+  }
+  if (expr.type === 'ReturnStatement') {
+    let argument = expr.argument
+    expr.type = 'ExpressionStatement'
+    expr.expression = argument
+    delete expr.argument
+  }
+  // now if its an ifstatement then return 
+  if (expr.type === 'IfStatement') {
+    expr.consequent = removeReturnNode(expr.consequent)
+    expr.alternate = removeReturnNode(expr.alternate)
+  }
+
+  if (expr.type === 'BlockStatement') {
+    expr.body = expr.body.map(e => removeReturnNode(e))
+  }
+
+  if (expr.type === 'TryStatement') {
+    expr.block = removeReturnNode(expr.block)
+    expr.handler.body = removeReturnNode(expr.handler.body)
+  }
+
+  return expr
+  
+}
 function genToStringObj(a) {
   return function() {
     return "[object " + a + "]"
@@ -914,10 +942,35 @@ var jstiller = (function() {
           pure: true,
           value: undefined
         };
+        let Binbody = []
 
         left = ast_reduce_scoped(ast.left, true);
         right = ast_reduce_scoped(ast.right, true);
-        
+        if (left.body) {
+          left.body.forEach(e => {Binbody.push(e)})
+        }
+
+        if (left.type === 'CallExpression' && left.callee && left.callee.body) {
+          if (left.callee.body.body) {
+            left.callee.body.body.forEach(e => {Binbody.push(e)})
+          } else {
+            left.callee.body.forEach(e => {Binbody.push(e)})
+          }          
+        }
+
+        if (right.type === 'CallExpression' && right.callee && right.callee.body) {
+          if (right.callee.body.body) {
+            right.callee.body.body.forEach(e => {Binbody.push(e)})
+          } else {
+            right.callee.body.forEach(e => {Binbody.push(e)})
+          }          
+        }
+
+
+        if (right.body) {
+          right.body.forEach(e => {Binbody.push(e)})
+        }
+
         let leftPure = left.pure || left.purearg || left.canPure || (left.retVal && left.retVal.pure)
         let rightPure = right.pure || right.purearg || right.canPure|| (right.retVal && right.retVal.pure)
         let binPure = leftPure & rightPure
@@ -932,6 +985,7 @@ var jstiller = (function() {
 
         if (left.pure && right.pure && ast.operator in boperators) {
           value = mkliteral(boperators[ast.operator](left.value, right.value))
+          value.body = Binbody
           return value;
         } else if ( binPure && ast.operator in boperators) {
           // it can be evaluted BUT DONT REDUCE!
@@ -939,28 +993,40 @@ var jstiller = (function() {
           if (left.retVal && left.retVal.pure) {
             leftVal = left.retVal
           }
-          if (!leftVal) {
-            // maybe purearg but theres not left val to reduce
-            return ast
-          }
+          
           let rightVal = right.value
           if (right.retVal && right.retVal.pure) {
             rightVal = right.retVal
           }
-          if (!rightVal) {
-            // maybe purearg but theres not left val to reduce
-            return ast
+
+          if (rightVal && leftVal) {
+            value = mkliteral(boperators[ast.operator](leftVal, rightVal))
+            return {
+              type: ast.type,
+              operator: ast.operator,
+              left: left ? left : ast.left,
+              right: right ? right : ast.right,
+              canPure: binPure,
+              retVal: value,
+              body: Binbody
+            };
           }
-          
-          value = mkliteral(boperators[ast.operator](leftVal, rightVal))
+          // well either left or right is not pure
+          if (left.pure) {
+            leftVal = left
+          }
+          if (right.pure) {
+            rightVal = right
+          }
           return {
             type: ast.type,
             operator: ast.operator,
-            left: left ? left : ast.left,
-            right: right ? right : ast.right,
-            canPure: binPure,
-            retVal: value
+            left: leftVal ? leftVal : left,
+            right: rightVal ? rightVal : right,
+            canPure: false,
+            body: Binbody
           };
+          
         } else {
           if (parent.type !== "ForStatement") { //nested Expr
             if (left.retVal && left.retVal.pure)
@@ -1092,6 +1158,7 @@ var jstiller = (function() {
 
               value = leftV + rightV
               value = mkliteral(value);
+              value.body = Binbody
 
               return (value)
             } catch (exc) { // thrown by toString() if it's not stringable
@@ -1101,7 +1168,8 @@ var jstiller = (function() {
                 operator: ast.operator,
                 left: left ? left : ast.left,
                 right: right ? right : ast.right,
-                canPure: binPure
+                canPure: binPure,
+                body: Binbody
               };
             }
           }
@@ -1110,16 +1178,23 @@ var jstiller = (function() {
             operator: ast.operator,
             left: left,
             right: right,
-            canPure: binPure
+            canPure: binPure,
+            body: Binbody
           };
         }
 
       case 'UnaryExpression':
 
         arg = ast_reduce_scoped(ast.argument);
+        let unBody = []
+        if (arg.body) {
+          arg.body.forEach(e => unBody.push(e))
+        }
+
         if (arg.pure && ast.operator in uoperators) {
           debug("UnaryExpression", ast)
           value = mkliteral(uoperators[ast.operator](arg.value))
+          value.body = unBody
           return value;
         } else {
           if (arg.type === "Identifier") { //In case it hasn't been expanded we try again.
@@ -1164,18 +1239,21 @@ var jstiller = (function() {
                 type: ast.type,
                 operator: ast.operator,
                 argument: arg,
-                prefix: ast.prefix
+                prefix: ast.prefix,
+                body: unBody
               }
             }
 
             value = mkliteral(value);
+            value.body = unBody
             return value
           }
           return {
             type: ast.type,
             operator: ast.operator,
             argument: arg,
-            prefix: ast.prefix
+            prefix: ast.prefix,
+            body: unBody
           };
         }
 
@@ -1193,15 +1271,34 @@ var jstiller = (function() {
         let bodyReduced = ast.body.map(ast_reduce_scoped)
         let progBody = []
         bodyReduced.forEach(expr => {
+          if (expr.type === "BinaryExpression" && expr.body) {
+            expr.body.forEach(ex => {progBody.push(ex)})
+          }
+          if (expr.type === 'WhileStatement' && expr.inlineBody) {
+            expr.inlineBody.forEach(ex => {progBody.push(ex)})
+          }
+          if (expr.type === 'Literal' && expr.body) {
+            expr.body.forEach(ex => {progBody.push(ex)})
+          }
           if (expr.type === 'VariableDeclaration' && expr.declarations &&
           expr.declarations[0].eval) {
             let varDeclarator = expr.declarations[0]
             varDeclarator.body.forEach(ex => {progBody.push(ex)})
             progBody.push(expr)
-          } else {
-            progBody.push(expr)
           }
+          if (expr.type === 'ExpressionStatement') {
+            // call expression can reduce to body of the function call
+            if (expr.expression.body) {
+              expr.expression.body.forEach(ex => {progBody.push(ex)})
+            }
+          }
+          progBody.push(expr)
+
         })
+
+        // need to remove all the return statements
+        progBody = progBody.map(e => removeReturnNode(e))
+
         ret.body = progBody
         return ret;
 
@@ -1267,7 +1364,9 @@ var jstiller = (function() {
         };
         debug("OPERATION: AssignmentExpression", parent, (ret))
         // console.log("OPERATION: AssignmentExpression", parent, (ret))
-
+        if (ret.right.body) {
+          ret.body = ret.right.body
+        }
         // Checks if assignment is on a variable belonging to an outer scope
         if (scope !== gscope && !scope.closed) {
           if (ret.left.type === 'MemberExpression') {
@@ -1421,7 +1520,6 @@ var jstiller = (function() {
           if (valFromScope) {
             debug("Identifier and in Scope", ret, parent)
             // Set the variable to be changed so when next time its used, dont propagate the constnat.
-            // console.log("Identifier and in Scope", ret, parent)
             if (ret.retVal) {
               valFromScope.value = ret.retVal;
               valFromScope.pure = _trv.type === "Literal" ? true : false;
@@ -1436,6 +1534,10 @@ var jstiller = (function() {
               } else if (ret.retVal) {
                 gscope[ret.left.name].value = ret.retVal;
               }
+            }
+
+            if (ret.left.name in scope) {
+              scope[ret.left.name].value = _trv
             }
 
           } else { // In no scope->then it's global.
@@ -2055,21 +2157,13 @@ var jstiller = (function() {
           valFromScope = findScope(realCallee.name, scope);
           let funcDeclaration = funcBodyMap.get(realCallee.name)
           if (!valFromScope && funcDeclaration) {
+            // not found in val scope but in func declaration
             valFromScope = {
               value: {
                 value: funcDeclaration
               }
             }
           }
-          // if (funcScope[realCallee.name]) {
-          //   // check for each of those entries, see if they containt the same a params as before.
-          //   let pastCalls =  funcScope[realCallee.name]
-          //   pastCalls.forEach(call => {
-          //     if (isEqual(call.params, c_arguments)) {
-          //       return mkliteral(call.value)
-          //     }
-          //   })
-          // }
           if (valFromScope && valFromScope.value && valFromScope.value.value) {
             if (valFromScope.value.value.type === 'FunctionExpression' || valFromScope.value.value.type === 'FunctionDeclaration') {
               if (!valFromScope.value.value.alreadyReduced) {
@@ -2079,11 +2173,6 @@ var jstiller = (function() {
                 // check if this function returns something...
                 // if nothing gets returned then just return ast
                 let functionBodies = valFromScope.value.value.body.body;
-                // if (functionBodies.length > 20) {
-                //   // the function is too big to just reduce,
-                //   // TODO ACTUALLY FIGURE OUT IF ITS PURE...
-                //   return ast
-                // }
                 let hasReturn = functionBodies.filter(function(e) {
                   return e.type === 'ReturnStatement';
                 }).length > 0;
@@ -2106,7 +2195,8 @@ var jstiller = (function() {
                   // this will be the return value of the function call
                   // reset to the funcbody
                   funcbody.pure = previousFuncPurity
-
+                  // filter out any top level return statements
+                  let noRetBody = value.body.filter(e => e.type !== "ReturnStatement")
                   // remove all the params
                   if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
                     // the same number of arguments called
@@ -2118,27 +2208,29 @@ var jstiller = (function() {
                   }
 
                   if (value.pure) {
-                    // if (!funcScope[realCallee.name]) {
-                    //   funcScope[realCallee.name] = []
-                    // }
-                    // funcScope[realCallee.name].push({
-                    //   param: c_arguments,
-                    //   value: value
-                    // })
-                    
-                    return mkliteral(value.value);
+                    let bodyRetVal = mkliteral(value.value);
+                    bodyRetVal.body = noRetBody
+                    return bodyRetVal
                   } else if (value.body){
-                    let lastBody = value.body[value.body.length -1]
-                    if (lastBody.type === 'ReturnStatement' && lastBody.pure) {
-                      // if (!funcScope[realCallee.name]) {
-                      //   funcScope[realCallee.name] = []
-                      // }
-                      // funcScope[realCallee.name].push({
-                      //   param: c_arguments,
-                      //   value: value
-                      // })
-                      return mkliteral(lastBody.argument.value);
+                    let retAST = null
+                    for (var i = 0; i < value.body.length; i++){
+                      // TODO FIND BETTER WAY TO ESTIMATE RETURN VALUE
+                      // find the first return statement that returns pure
+                      // this is technically wrong because of branches and errors,
+                      // ... but without execution this is the best we can do
+                      let ex = value.body[i]
+                      if (ex.type === 'ReturnStatement') {
+                        let bodyRetVal = ex.argument
+                        if (ex.pure) {
+                          bodyRetVal = mkliteral(ex.argument.value);
+                        }
+                        bodyRetVal.body = noRetBody
+                        retAST = bodyRetVal
+                        return retAST
+                      }
                     }
+                    // if we cant find a pure return statement, then this call is too hard to inline
+                    return ast 
                   } else {
                     // cannot be reduced purely
                     return ast
@@ -2882,9 +2974,17 @@ var jstiller = (function() {
           kind: ast.kind,
           declarations: ast.declarations.map(ast_reduce_scoped)
         };
+        let delcaredSubBodies = []
+        ret.declarations.forEach(declaration => {
+          if (declaration.body) {
+            declaration.body.forEach(exp => {delcaredSubBodies.push(exp)})
+          }
+        })
+        ret.body = delcaredSubBodies
         ret.pure = ret.declarations.every(function(e) {
           return !e.init || e.init.pure || e.init.pured || e.init.purable || e.init.pure_global;
         });
+
         return ret;
 
 
@@ -2899,6 +2999,9 @@ var jstiller = (function() {
           ret.body = init.body
           ret.eval = true
           return ret
+        }
+        if (init && init.body) {
+          ret.body = init.body
         }
 
         ret.init = init
@@ -3161,13 +3264,27 @@ var jstiller = (function() {
         taintedScope = null
         let RetFlattenBody = []
         RetBody.forEach(expr => {
-          if (expr.type === 'BlockStatement') {
-            expr.body.forEach(ex => {RetFlattenBody.push(ex)})
-          } else if (expr.eval) {
-            expr.body.forEach(ex => {RetFlattenBody.push(ex)})
-            RetFlattenBody.push(expr)
-          } else {
-            RetFlattenBody.push(expr)
+          if (expr) {
+            if (expr.type === 'BlockStatement') {
+              expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+            } else if (expr.type === "ReturnStatement" && expr.argument && expr.argument.type === 'CallExpression' &&  expr.argument.callee &&  expr.argument.callee.body && expr.argument.callee.body.body) {
+              expr.argument.callee.body.body.forEach(ex => {RetFlattenBody.push(ex)})
+              RetFlattenBody.push(expr)
+            } else if (expr.type === "ExpressionStatement" && expr.expression.type === 'AssignmentExpression' && expr.expression.right && expr.expression.right.body) {
+              expr.expression.right.body.forEach(ex => {RetFlattenBody.push(ex)})
+              RetFlattenBody.push(expr)
+            } else if (expr.type === "ReturnStatement" && expr.argument && expr.argument.body) {
+              expr.argument.body.forEach(ex => {RetFlattenBody.push(ex)})
+              RetFlattenBody.push(expr)
+            }  else if (expr.body) {
+              expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+              RetFlattenBody.push(expr)
+            } else if (expr.eval) {
+              expr.body.forEach(ex => {RetFlattenBody.push(ex)})
+              RetFlattenBody.push(expr)
+            } else {
+              RetFlattenBody.push(expr)
+            }
           }
         })
         // reduce any new call expr statment that are converted to function body type
@@ -3260,7 +3377,7 @@ var jstiller = (function() {
         } else if (value.type === 'BinaryExpression') {
           ret = {
             type: 'ReturnStatement',
-            argument: value.canPure || scope.closed ? value : ast.argument
+            argument: value
           };
           ret.pure = ret.argument && (ret.argument.canPure || ret.argument.pure || ret.argument.pured || ret.argument.purable || (ret.argument.type === "Identifier" && global_vars.indexOf(ret.argument.name) !== -1));
           
@@ -3378,15 +3495,28 @@ var jstiller = (function() {
 
       case 'DoWhileStatement':
       case 'WhileStatement':
-        ++inLoop;
+        // ++inLoop;
         ret = {
           type: ast.type,
-          test: ast_reduce(ast.test, scope, false, ast), // Expand or Not?Lookahead?
           /*Error.. should be considered if Not dependent by the cycle or not? 
            body: ast_reduce_scoped(ast.body) */
-          body: ast_reduce(ast.body, scope, false, ast) //????
+          inlineBody: [],
         };
-        --inLoop;
+        let whiletestReduced = ast_reduce(ast.test, scope, false, ast)
+
+        if (whiletestReduced.body) {
+          ret.inlineBody = whiletestReduced.body
+        }
+        ret.test = whiletestReduced // Expand or Not?Lookahead?
+
+        let whileBody =  ast_reduce(ast.body, scope, false, ast) 
+        if (whileBody.type === 'BreakStatement') {
+          // its justa  break as body, reduce as just the test
+          whiletestReduced.inlineBody = ret.inlineBody 
+          return whiletestReduced
+        }
+
+        // --inLoop;
         return ret;
 
       case 'ForStatement':

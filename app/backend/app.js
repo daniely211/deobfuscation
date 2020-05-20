@@ -42,6 +42,7 @@ function removeUnusedVariablesBabel(code) {
   return babelFormat(babelCore.transform(code, { plugins: [ removeUnused ], ast: false, generatorOpts }).code)
 }
 
+// ADD comments for any function inlining. making it easier to read and back track
 tree = new TreeModel()
 let codeMap = new Map()
 let CodeRoot;
@@ -65,13 +66,13 @@ function RemoveCommnets(code) {
 function removeUnusedVariables(code) {
   // Need to remove all unused variable declaration
   // console.log("Removing Unused variables with Putout")
-  // const removedUnused = putout(code, {
-  //   plugins: [
-  //       'remove-unused-variables'
-  //   ]
-  // });
-  // return removedUnused.code
-  return removeUnusedVariablesBabel(code)
+  const removedUnused = putout(code, {
+    plugins: [
+        'remove-unused-variables'
+    ]
+  });
+  return removedUnused.code
+  // return removeUnusedVariablesBabel(code)
 }
 
 function removeUnusedFunctionsDeclarations(code) {
@@ -97,7 +98,7 @@ function removeUnusedFunctionsDeclarations(code) {
       this.traverse(path);
     }
   });
-  let newBody = ast.body.filter(expr => expr.type === 'FunctionDeclaration' && functionsDeclaredCallMap.get(expr.id.name))
+  let newBody = ast.body.filter(expr => (expr.type === 'FunctionDeclaration' && functionsDeclaredCallMap.get(expr.id.name)) || expr.type !== 'FunctionDeclaration')
   ast.body = newBody
   var output = escodegen.generate(ast, {
     comment: false
@@ -278,7 +279,6 @@ app.post('/dynamic', function(req, res) {
   return;
 });
 
-
 app.post('/undo', function(req, res) {
   try {
     res.status(200);
@@ -333,8 +333,7 @@ app.post('/checkpoint', function(req, res) {
 
   res.end();
   return;
-})  
-
+})
 
 app.post('/save', function(req, res) {
   // save the current state into a json file
@@ -386,7 +385,6 @@ app.post('/load', function(req, res) {
   res.end();
   return;
 })  
-
 
 function PrettifyCode(code) {
   let allDeclaredVariables = []
@@ -496,7 +494,11 @@ app.post('/unused', function(req, res) {
   try {
     codeRecord.push(originalCode)
     let output = removeUnusedVariables(originalCode)
-
+    try{
+      output = PrettifyCode(output)
+    } catch(e) {
+      console.log("Cannot prettify code, please manual edit the code.")
+    }
     if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()
@@ -638,6 +640,7 @@ app.post('/constantProp', function(req, res) {
     // find the functions that used array indexing
     // then call the illuminate for it
     console.log("about use use illuminate")
+
     let illuminatePropagatedCode = illuminateDeobfuscate(originalCode)
     // let illuminatePropagatedCode = originalCode
     console.log("Finished illuminate")
@@ -649,34 +652,6 @@ app.post('/constantProp', function(req, res) {
     .replace(`"http://`, `"http:/"+"/" +"`)
     console.log("Esprima prasing...")
     var ast = esprima.parse(illuminatePropagatedCode);
-    recast.visit(ast, {
-      visitFunctionDeclaration(path) {
-        var node = path.node;
-        let functionName = node.id.name
-        // all functions that simply return a literal inline them
-        if (node.body && node.body.body ){
-          const functionStatements = node.body.body
-          const lastStatement = functionStatements[functionStatements.length - 1]
-          if(n.ReturnStatement.check(lastStatement)) {
-            // if the function returns on the last statement,
-            if (n.Literal.check(lastStatement.argument)) {
-              // it returns a literal, now i replace all function calls to this literal
-              const literalstmt =  lastStatement.argument
-              functionNameLitMapping.set(functionName, literalstmt.value)
-            }
-            if (n.Identifier.check(lastStatement.argument)) {
-              // it returns a literal, now i replace all function calls to this literal
-              const identifier =  lastStatement.argument
-              if (identifier.name === 'ActiveXObject') {
-                functionNameLitMapping.set(functionName, identifier.name)
-              }
-            }
-          }
-        }
-        this.traverse(path);
-      }
-    });
-    console.log("Finished marking functionName and literal maping")
     if (functionNameLitMapping.size > 0) {
       // we found some functions that just return a literal
       // now we go through all the calls to functions that has the name in function lit mapping and replace it with a literal
@@ -732,7 +707,7 @@ app.post('/constantProp', function(req, res) {
     }
     jstiller.init();
     ast = jstiller.deobfuscate(ast, null, true);
-    console.log("Finished JSTillery deobfusacte")
+    console.log("Finished JSTillery deobfusacte"))
 
     var output = escodegen.generate(ast, {
       comment: false
@@ -745,6 +720,10 @@ app.post('/constantProp', function(req, res) {
       console.log("Cannot prettify code, please manual edit the code.")
     }
 
+    console.log("Removing all the duplicated variable declarations")
+    // at the moment it only changes the lets into the const
+    output = removeAllDuplicateDeclarations(output)
+    console.log("Done Removing all the duplicated variable declarations")
 
     if (originalCode === output) {
       // if the same no new record added

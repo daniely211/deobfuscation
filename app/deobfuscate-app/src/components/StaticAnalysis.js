@@ -60,7 +60,9 @@ function StaticAnalysis (props) {
     })
     .then(res => res.json())
     .then(json => {
-
+      console.log("JSON!!!")
+      console.log(json)
+      // if ()
       if (path === '/save') {
         handleFilenameChange('')
       }

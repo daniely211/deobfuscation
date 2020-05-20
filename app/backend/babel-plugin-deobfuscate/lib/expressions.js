@@ -41,9 +41,9 @@ function evaluator(path) {
     else if (path.isMemberExpression()) {
         return memberExpressions.evaluate;
     }
-    else if (path.isCallExpression()) {
-        return callExpressions.evaluate;
-    }
+    // else if (path.isCallExpression()) {
+    //     return callExpressions.evaluate;
+    // }
     else if (path.isNewExpression()) {
         return newExpressions.evaluate;
     }

@@ -8,9 +8,9 @@ var loops_1 = require("./loops");
 function Deobfuscator(babel) {
     return {
         VariableDeclaration: declarations_1.transformDeclaration,
-        CallExpression: function (path) {
-            call_expressions_1.inlineProcedure(path, babel.traverse);
-        },
+        // CallExpression: function (path) {
+        //     call_expressions_1.inlineProcedure(path, babel.traverse);
+        // },
         Expression: {
             enter: expressions_1.deobfuscateExpression,
             exit: function (path) {
