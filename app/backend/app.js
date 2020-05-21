@@ -707,7 +707,7 @@ app.post('/constantProp', function(req, res) {
     }
     jstiller.init();
     ast = jstiller.deobfuscate(ast, null, true);
-    console.log("Finished JSTillery deobfusacte"))
+    console.log("Finished JSTillery deobfusacte")
 
     var output = escodegen.generate(ast, {
       comment: false

