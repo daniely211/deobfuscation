@@ -159,9 +159,9 @@ function StaticAnalysis (props) {
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/unused')}>
             Remove Unused Variables
           </Button>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/unusedFunctions')}>
+          {/* <Button variant="contained" color="primary" onClick={() => handleClick(code, '/unusedFunctions')}>
             Remove Unused Functions
-          </Button>
+          </Button> */}
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/undo')}>
             Undo transformation
           </Button>

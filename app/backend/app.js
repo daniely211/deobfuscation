@@ -720,11 +720,6 @@ app.post('/constantProp', function(req, res) {
       console.log("Cannot prettify code, please manual edit the code.")
     }
 
-    console.log("Removing all the duplicated variable declarations")
-    // at the moment it only changes the lets into the const
-    output = removeAllDuplicateDeclarations(output)
-    console.log("Done Removing all the duplicated variable declarations")
-
     if (originalCode === output) {
       // if the same no new record added
       codeRecord.pop()

@@ -27,6 +27,7 @@
 var DEBUGNAME = __filename.slice(__dirname.length + 1, -3);
 var debug = require('util').debuglog(DEBUGNAME);
 const clonedeep = require('lodash.clonedeep')
+const crypto = require('crypto');
 
 var parseAst = require("esprima").parse;
 var genCode = require("escodegen").generate;
@@ -38,6 +39,152 @@ require("./libs/cycle");
 var collectHTMLData = require("./libs/htmlParse").collectHTMLData
 
 var USE_PARTIAL = typeof process.env.USE_PARTIAL !== 'undefined' ? process.env.USE_PARTIAL : true;
+
+function renameVarWithNewName(expr, mapping, funcbodyMap) {
+  let newMapping = mapping;
+  let newMappingBody;
+  let changedExpr;
+  let newMappingBodyMerge
+  let retValArr
+  if (!expr) {
+    return expr
+  }
+  switch(expr.type) {
+    case 'BlockStatement':
+      let newBodyExpr = [];
+      expr.body.forEach(ex => {
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        changedExpr = retValArr[0]
+        newMappingBodyMerge = retValArr[1]
+        newBodyExpr.push(changedExpr)
+        newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+      })
+      expr.body = newBodyExpr
+      break
+    case 'AssignmentExpression':
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap)
+      expr.left = retValArr[0]
+      newMapping = retValArr[1]
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap)
+      expr.right = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'Identifier':
+      switch(expr.name) {
+        case 'ActiveXObject':
+          return [expr, newMapping]
+      }
+      if (funcbodyMap.get(expr.name)) {
+        // its a function identifer dont change it
+        return expr
+      }
+      if (newMapping.get(expr.name)) {
+        expr.name = newMapping.get(expr.name)
+      } else {
+        const randID = crypto.randomBytes(20).toString('hex').substring(1, 3);
+        const newID = `${expr.name}_${randID}`
+        newMapping.set(expr.name, newID)
+        expr.name = newID
+      }
+      break
+    case 'VariableDeclaration':
+      let newDeclarations = [];
+      expr.declarations.forEach(ex => {
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        newDeclarations.push(retValArr[0])
+        newMappingBodyMerge = retValArr[1]
+        newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+      })
+      expr.declarations = newDeclarations
+      break
+    case 'ExpressionStatement':
+      retValArr = renameVarWithNewName(expr.expression, newMapping, funcbodyMap)
+      expr.expression = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'VariableDeclarator':
+      retValArr = renameVarWithNewName(expr.id, newMapping, funcbodyMap)
+      expr.id = retValArr[0]
+      newMapping = retValArr[1]
+      retValArr = renameVarWithNewName(expr.init, newMapping, funcbodyMap)
+      expr.init = retValArr? retValArr[0]: expr.init
+      newMapping = retValArr? retValArr[1]: newMapping
+      break
+    case 'CallExpression':
+      let newArguments = [];
+      expr.arguments.forEach(ex => {
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        changedExpr = retValArr[0]
+        newMappingBodyMerge = retValArr[1]
+        newArguments.push(changedExpr)
+        newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+      })
+      expr.arguments = newArguments
+      break
+    case 'BinaryExpression':
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap)
+      expr.left = retValArr[0]
+      newMapping = retValArr[1]
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap)
+      expr.right = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'Ifstatement':
+      if (expr.consequent) {
+        let newConsequent = [];
+        expr.consequent.forEach(ex => {
+          retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+          changedExpr = retValArr[0]
+          newMappingBodyMerge = retValArr[1]
+          newConsequent.push(changedExpr)
+          newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+        })
+        expr.consequent = newConsequent
+      }
+      if (expr.alternate) {
+        let newAlternate = [];
+        expr.consequent.forEach(ex => {
+          retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+          changedExpr = retValArr[0]
+          newMappingBodyMerge = retValArr[1]
+          newAlternate.push(changedExpr)
+          newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+        })
+        expr.alternate = newAlternate
+      }
+      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap)
+      expr.test = retValArr[0]
+      newMapping = retValArr[1]
+      break
+  }
+
+  return [expr, newMapping]
+}
+
+function consoleLogExpr(msg) {
+  return {
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'CallExpression',
+      callee: {
+        type: 'MemberExpression',
+        object: {
+          type: 'Identifier',
+          name: 'console'
+        },
+        property: {
+          type: 'Identifier',
+          name: 'log'
+        },
+      },
+      arguments: [{
+        type: 'Literal',
+        value: msg,
+        raw: msg
+      }]
+    },
+  }
+}
 
 function removeReturnNode (expr) {
   if (!expr) {
@@ -1607,7 +1754,8 @@ var jstiller = (function() {
         }
 
         realCallee.called = true;
-        var c_arguments = ast.arguments.map(a => ast_reduce_scoped(a, true));
+
+        var c_arguments = ast.arguments? ast.arguments.map(a => ast_reduce_scoped(a, true)) : [];
         realCallee.called_with_args = c_arguments;
         ret.arguments = c_arguments;
         /*ret = {
@@ -2191,6 +2339,17 @@ var jstiller = (function() {
                   let funcbody = valFromScope.value.value.body
                   let previousFuncPurity = funcbody.pure 
                   funcbody.pure = true
+                  let newbody = [];
+                  let mergeMap = new Map()
+                  // Here we need to rename all the variables declarations and assignments with a random number append to the end of the variable name
+                  // E.g  var PD = 3 -> var PD_1624623412 = 3
+                  // PD = 10 -> PD_1624623412 = 10
+                  funcbody.body.forEach(ex =>{
+                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap)
+                    newbody.push(retValNewName[0])
+                    mergeMap = new Map([...retValNewName[1], ...mergeMap])
+                  })
+                  funcbody.body = newbody
                   value = ast_reduce_scoped(funcbody);
                   // this will be the return value of the function call
                   // reset to the funcbody
@@ -2224,6 +2383,12 @@ var jstiller = (function() {
                         if (ex.pure) {
                           bodyRetVal = mkliteral(ex.argument.value);
                         }
+                        if (!isEqual(noRetBody[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
+                          noRetBody = [consoleLogExpr('Begining body of ' + realCallee.name)].concat(noRetBody)
+                          noRetBody.push(consoleLogExpr('End body of ' + realCallee.name))
+                        }
+                        
+                        // noRetBody = noRetBody.map(ex => renameVarWithNewName(ex, new Map(), funcBodyMap))
                         bodyRetVal.body = noRetBody
                         retAST = bodyRetVal
                         return retAST
@@ -3263,23 +3428,30 @@ var jstiller = (function() {
         let RetBody = ast.body.map(ast_reduce_scoped)
         taintedScope = null
         let RetFlattenBody = []
+        // let currentScopeDeclared = []
         RetBody.forEach(expr => {
           if (expr) {
             if (expr.type === 'BlockStatement') {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.body.forEach(ex => {RetFlattenBody.push(ex)})
             } else if (expr.type === "ReturnStatement" && expr.argument && expr.argument.type === 'CallExpression' &&  expr.argument.callee &&  expr.argument.callee.body && expr.argument.callee.body.body) {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.argument.callee.body.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
             } else if (expr.type === "ExpressionStatement" && expr.expression.type === 'AssignmentExpression' && expr.expression.right && expr.expression.right.body) {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.expression.right.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
             } else if (expr.type === "ReturnStatement" && expr.argument && expr.argument.body) {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.argument.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
             }  else if (expr.body) {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
             } else if (expr.eval) {
+              // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
             } else {
