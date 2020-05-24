@@ -40,7 +40,7 @@ var collectHTMLData = require("./libs/htmlParse").collectHTMLData
 
 var USE_PARTIAL = typeof process.env.USE_PARTIAL !== 'undefined' ? process.env.USE_PARTIAL : true;
 
-function renameVarWithNewName(expr, mapping, funcbodyMap) {
+function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
   let newMapping = mapping;
   let newMappingBody;
   let changedExpr;
@@ -53,7 +53,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap) {
     case 'BlockStatement':
       let newBodyExpr = [];
       expr.body.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
         changedExpr = retValArr[0]
         newMappingBodyMerge = retValArr[1]
         newBodyExpr.push(changedExpr)
@@ -61,36 +61,85 @@ function renameVarWithNewName(expr, mapping, funcbodyMap) {
       })
       expr.body = newBodyExpr
       break
+
+    case 'CatchClause':
+      retValArr = renameVarWithNewName(expr.param, newMapping, funcbodyMap, listParams);
+      expr.param = retValArr[0]
+      newMapping = retValArr[1]
+      retValArr = renameVarWithNewName(expr.body, newMapping, funcbodyMap, listParams);
+      expr.body = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'TryStatement':
+      retValArr = renameVarWithNewName(expr.block, newMapping, funcbodyMap, listParams);
+      expr.block = retValArr[0]
+      newMapping = retValArr[1]
+      retValArr = renameVarWithNewName(expr.handler, newMapping, funcbodyMap, listParams);
+      expr.handler = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'LogicalExpression':
+    case 'BinaryExpression':
     case 'AssignmentExpression':
-      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams)
       expr.left = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams)
       expr.right = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'Identifier':
       switch(expr.name) {
+        case 'String':
+        case 'fromCharCode':
         case 'ActiveXObject':
+        case 'GetSpecialFolder':
+        case 'GetTempName':
+        case 'ScriptFullName':
+        case 'open':
+        case 'Status':
+        case 'console':
+        case 'Write':
+        case 'Type':
+        case 'Size':
+        case 'append':
+        case 'fields':
+        case 'addNew':
+        case 'appendChunk':
+        case 'bin':
+        case 'deleteFile':
+        case 'update':
+        case 'WScript':
           return [expr, newMapping]
+      }
+      // check if the expr.name exisit in list param
+      let filtEx = listParams.filter(ex => ex.name === expr.name)
+      if (filtEx.length > 0) {
+        // its a parameter identifer dont change it
+        return [expr, newMapping]
       }
       if (funcbodyMap.get(expr.name)) {
         // its a function identifer dont change it
-        return expr
+        return [expr, newMapping]
       }
       if (newMapping.get(expr.name)) {
         expr.name = newMapping.get(expr.name)
+        expr.randomised = true
       } else {
-        const randID = crypto.randomBytes(20).toString('hex').substring(1, 3);
+        if (expr.randomised) {
+          return [expr, newMapping]
+        }
+        const randID = crypto.randomBytes(20).toString('hex').substring(1, 4);
         const newID = `${expr.name}_${randID}`
         newMapping.set(expr.name, newID)
         expr.name = newID
+        expr.randomised = true
       }
       break
     case 'VariableDeclaration':
       let newDeclarations = [];
       expr.declarations.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
         newDeclarations.push(retValArr[0])
         newMappingBodyMerge = retValArr[1]
         newMapping = new Map([...newMappingBodyMerge, ...newMapping])
@@ -98,61 +147,90 @@ function renameVarWithNewName(expr, mapping, funcbodyMap) {
       expr.declarations = newDeclarations
       break
     case 'ExpressionStatement':
-      retValArr = renameVarWithNewName(expr.expression, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.expression, newMapping, funcbodyMap, listParams)
       expr.expression = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'VariableDeclarator':
-      retValArr = renameVarWithNewName(expr.id, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.id, newMapping, funcbodyMap, listParams)
       expr.id = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.init, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.init, newMapping, funcbodyMap, listParams)
       expr.init = retValArr? retValArr[0]: expr.init
       newMapping = retValArr? retValArr[1]: newMapping
       break
     case 'CallExpression':
       let newArguments = [];
       expr.arguments.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
         changedExpr = retValArr[0]
         newMappingBodyMerge = retValArr[1]
         newArguments.push(changedExpr)
         newMapping = new Map([...newMappingBodyMerge, ...newMapping])
       })
       expr.arguments = newArguments
+      retValArr = renameVarWithNewName(expr.callee, newMapping, funcbodyMap, listParams);
+      expr.callee = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'MemberExpression':
+      retValArr = renameVarWithNewName(expr.object, newMapping, funcbodyMap, listParams);
+      expr.object = retValArr? retValArr[0]: expr.object
+      newMapping = retValArr? retValArr[1]: newMapping
+      // retValArr = renameVarWithNewName(expr.property, newMapping, funcbodyMap, listParams);
+      // expr.property = retValArr? retValArr[0]: expr.property
+      // newMapping = retValArr? retValArr[1]: newMapping
       break
     case 'BinaryExpression':
-      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams)
       expr.left = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams)
       expr.right = retValArr[0]
       newMapping = retValArr[1]
       break
-    case 'Ifstatement':
+    case 'ReturnStatement':
+        retValArr = renameVarWithNewName(expr.argument, newMapping, funcbodyMap, listParams)
+        expr.argument = retValArr[0]
+        newMapping = retValArr[1]
+        break
+    case 'IfStatement':
       if (expr.consequent) {
         let newConsequent = [];
-        expr.consequent.forEach(ex => {
-          retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
-          changedExpr = retValArr[0]
-          newMappingBodyMerge = retValArr[1]
-          newConsequent.push(changedExpr)
-          newMapping = new Map([...newMappingBodyMerge, ...newMapping])
-        })
-        expr.consequent = newConsequent
+        if (expr.consequent.length > 0) {
+          expr.consequent.forEach(ex => {
+            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+            changedExpr = retValArr[0]
+            newMappingBodyMerge = retValArr[1]
+            newConsequent.push(changedExpr)
+            newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+          })
+          expr.consequent = newConsequent
+        } else {
+          retValArr = renameVarWithNewName(expr.consequent, newMapping, funcbodyMap, listParams)
+          expr.consequent = retValArr[0]
+          newMapping = retValArr[1]
+        }
+        
       }
       if (expr.alternate) {
         let newAlternate = [];
-        expr.consequent.forEach(ex => {
-          retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap);
-          changedExpr = retValArr[0]
-          newMappingBodyMerge = retValArr[1]
-          newAlternate.push(changedExpr)
-          newMapping = new Map([...newMappingBodyMerge, ...newMapping])
-        })
-        expr.alternate = newAlternate
+        if (expr.alternate.length > 0) {
+          expr.alternate.forEach(ex => {
+            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+            changedExpr = retValArr[0]
+            newMappingBodyMerge = retValArr[1]
+            newAlternate.push(changedExpr)
+            newMapping = new Map([...newMappingBodyMerge, ...newMapping])
+          })
+          expr.alternate = newAlternate
+        } else {
+          retValArr = renameVarWithNewName(expr.alternate, newMapping, funcbodyMap, listParams)
+          expr.alternate = retValArr[0]
+          newMapping = retValArr[1]
+        }
       }
-      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap)
+      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap, listParams)
       expr.test = retValArr[0]
       newMapping = retValArr[1]
       break
@@ -2344,16 +2422,19 @@ var jstiller = (function() {
                   // Here we need to rename all the variables declarations and assignments with a random number append to the end of the variable name
                   // E.g  var PD = 3 -> var PD_1624623412 = 3
                   // PD = 10 -> PD_1624623412 = 10
-                  funcbody.body.forEach(ex =>{
-                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap)
+                  let listParams = valFromScope.value.value.params
+
+                  let funcBodyCopy = clonedeep(funcbody)
+                  funcBodyCopy.body.forEach(ex =>{
+                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams)
                     newbody.push(retValNewName[0])
                     mergeMap = new Map([...retValNewName[1], ...mergeMap])
                   })
-                  funcbody.body = newbody
-                  value = ast_reduce_scoped(funcbody);
+                  funcBodyCopy.body = newbody
+                  value = ast_reduce_scoped(funcBodyCopy);
                   // this will be the return value of the function call
                   // reset to the funcbody
-                  funcbody.pure = previousFuncPurity
+                  funcBodyCopy.pure = previousFuncPurity
                   // filter out any top level return statements
                   let noRetBody = value.body.filter(e => e.type !== "ReturnStatement")
                   // remove all the params
@@ -2383,7 +2464,7 @@ var jstiller = (function() {
                         if (ex.pure) {
                           bodyRetVal = mkliteral(ex.argument.value);
                         }
-                        if (!isEqual(noRetBody[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
+                        if (noRetBody.length > 0 && !isEqual(noRetBody[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
                           noRetBody = [consoleLogExpr('Begining body of ' + realCallee.name)].concat(noRetBody)
                           noRetBody.push(consoleLogExpr('End body of ' + realCallee.name))
                         }
@@ -2417,10 +2498,20 @@ var jstiller = (function() {
                       }
                     })
                   }
+                  let listParams = valFromScope.value.value.params
 
                   let funcbody = valFromScope.value.value.body
                   funcbody.pure = true
-                  let reducedBody = ast_reduce_scoped(funcbody);
+                  let funcBodyCopy = clonedeep(funcbody)
+                  let mergeMap = new Map() // this cant be new... should be inherited from the outer call....
+                  let newbody = [];
+                  funcBodyCopy.body.forEach(ex =>{
+                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams)
+                    newbody.push(retValNewName[0])
+                    mergeMap = new Map([...retValNewName[1], ...mergeMap])
+                  })
+                  funcBodyCopy.body = newbody
+                  let reducedBody = ast_reduce_scoped(funcBodyCopy);
                   
                   if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
                     // the same number of arguments called
@@ -2429,6 +2520,10 @@ var jstiller = (function() {
                         delete scope[p.name]
                       }
                     })
+                  }
+                  if (reducedBody.body.length > 0 && !isEqual(reducedBody.body[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
+                    reducedBody.body = [consoleLogExpr('Begining body of ' + realCallee.name)].concat(reducedBody.body)
+                    reducedBody.body.push(consoleLogExpr('End body of ' + realCallee.name))
                   }
                   return reducedBody // need to change
                 }
