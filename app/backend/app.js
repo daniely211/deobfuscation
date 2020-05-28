@@ -15,7 +15,6 @@ var esprima = require('esprima');
 var escodegen = require('escodegen');
 var esmangle = require('esmangle');
 const jsdom = require("jsdom");
-// var isEmpty = require('lodash.isempty');
 const helper = require('./helper')
 var TreeModel = require('tree-model')
 const n = recast.types.namedTypes;
@@ -36,6 +35,38 @@ const generatorOpts = { compact: false }
 
 function illuminateDeobfuscate(code) {
   return babelFormat(babelCore.transform(code, { plugins: [ deobfuscatePlugin ], ast: false, generatorOpts }).code)
+}
+
+function removeUnusedVariableDeclarations(code) {
+  var ast = esprima.parse(code);
+  let idenMap = new Map();
+  recast.visit(ast, {
+    visitIdentifier(path){
+      let node = path.node
+      if(idenMap.get(node.name)) {
+        idenMap.set(node.name, idenMap.get(node.name) + 1)
+      } else {
+        idenMap.set(node.name, 1)
+      }
+      this.traverse(path);
+    }
+  })
+
+  recast.visit(ast, {
+    visitVariableDeclaration(path){
+      let node = path.node
+      let declarations = node.declarations
+      declarations = declarations.filter(declarator => idenMap.get(declarator.id.name) === 1)
+      if (declarations.length > 0) {
+        path.prune();
+      }
+      this.traverse(path)
+    }
+  })
+  var output = escodegen.generate(ast, {
+    comment: false
+  });
+  return output
 }
 
 function removeUnusedVariablesBabel(code) {
@@ -71,39 +102,8 @@ function removeUnusedVariables(code) {
         'remove-unused-variables'
     ]
   });
-  return removedUnused.code
-  // return removeUnusedVariablesBabel(code)
-}
-
-function removeUnusedFunctionsDeclarations(code) {
-  var ast = esprima.parse(code);
-  var functionsDeclaredCallMap = new Map()
-  recast.visit(ast, {
-    visitFunctionDeclaration(path) {
-      var node = path.node;
-      let functionName = node.id.name
-      // all functions that simply return a literal inline them
-      if (!functionsDeclaredCallMap.get(functionName)) {
-        functionsDeclaredCallMap.set(functionName, false)
-      }
-      this.traverse(path);
-    },
-    visitCallExpression(path) {
-      let node = path.node
-      let callee = node.callee
-      if (n.Identifier.check(callee)){
-        const calleeName = callee.name
-        functionsDeclaredCallMap.set(calleeName, true)
-      }
-      this.traverse(path);
-    }
-  });
-  let newBody = ast.body.filter(expr => (expr.type === 'FunctionDeclaration' && functionsDeclaredCallMap.get(expr.id.name)) || expr.type !== 'FunctionDeclaration')
-  ast.body = newBody
-  var output = escodegen.generate(ast, {
-    comment: false
-  });
-  return output
+  code = removeUnusedVariablesBabel(removedUnused.code)
+  return removeUnusedVariableDeclarations(code)
 }
 
 app.get('/clearHistory', function(req, res, next) {
@@ -319,7 +319,7 @@ app.post('/checkpoint', function(req, res) {
     }
   }
 
-  const newChild = tree.parse({id: codeTreeID, label: "Checkpoint"})
+  const newChild = tree.parse({id: codeTreeID, label: "Manual Change"})
   codeMap.set(codeTreeID, newCode)
   codeTreeID++
   console.log(codeCurrentParent)
@@ -527,53 +527,6 @@ app.post('/unused', function(req, res) {
   return;
 });
 
-app.post('/unusedFunctions', function(req, res) {
-  const originalCode = req.body.source
-  if (!CodeRoot) {
-    CodeRoot = tree.parse({id: codeTreeID, label:"root"})
-    codeMap.set(codeTreeID, originalCode)
-    codeTreeID++
-    codeCurrentParent = CodeRoot
-  }
-
-  try {
-    codeRecord.push(originalCode)
-    let output = removeUnusedFunctionsDeclarations(originalCode)
-
-    try{
-      output = PrettifyCode(output)
-    } catch(e) {
-      console.log("Cannot prettify code, please manual edit the code.")
-    }
-    
-    if (originalCode === output) {
-      // if the same no new record added
-      codeRecord.pop()
-    } else {
-      // Theres something new!!
-      // update the code tree with the current parent
-      const newChild = tree.parse({id: codeTreeID, label:"unused Func"})
-      codeMap.set(codeTreeID, output)
-      codeTreeID++
-      codeCurrentParent = codeCurrentParent.addChild(newChild)
-    }
-    const treeJson = JSON.stringify(CodeRoot.model)
-
-    res.status(200);
-    res.json({
-      source: output,
-      codeTree: treeJson,
-      codeTreeID: codeTreeID,
-    });
-  } catch (e) {
-    res.json({
-      error: e
-    })
-  }
-  res.end();
-  return;
-});
-
 app.post('/getNode', function(req, res) {
   let newID = req.body.newId
   let diff = req.body.diff
@@ -635,14 +588,10 @@ app.post('/constantProp', function(req, res) {
   }
   try {
     codeRecord.push(originalCode)
-    // need to get rid of "//"
 
-    // find the functions that used array indexing
-    // then call the illuminate for it
     console.log("about use use illuminate")
 
     let illuminatePropagatedCode = illuminateDeobfuscate(originalCode)
-    // let illuminatePropagatedCode = originalCode
     console.log("Finished illuminate")
 
     illuminatePropagatedCode = illuminatePropagatedCode

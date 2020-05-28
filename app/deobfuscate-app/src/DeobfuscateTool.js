@@ -249,7 +249,7 @@ function DeobfuscateTool(props) {
       <AppBar position="fixed" className={classes.appBar}>
         <Tabs value={value} onChange={handleChange} aria-label="simple tabs example">
           <Tab label="Static Analysis" {...a11yProps(0)} />
-          <Tab label="Dynamic Analysis" {...a11yProps(1)} />
+          {/* <Tab label="Dynamic Analysis" {...a11yProps(1)} /> */}
         </Tabs>
       </AppBar>
       <Drawer
@@ -283,7 +283,6 @@ function DeobfuscateTool(props) {
         </TabPanel>
         <TabPanel value={drawerTabValue} index={1}>
           <List>
-
             {saves.map(filename => (
               <ListItem key={filename} button onClick={() => loadFile(filename)}>
                 <ListItemText primary={filename} />
@@ -296,7 +295,7 @@ function DeobfuscateTool(props) {
       </Drawer>
     <main className={classes.content}>
       <StaticAnalysis value={value} index={0}/>
-      <DynamicAnalysis value={value} index={1}/>
+      {/* <DynamicAnalysis value={value} index={1}/> */}
       <JSConsole/>
     </main>
     </React.Fragment>

@@ -516,8 +516,7 @@ const deobfuscation = (state = defaultState, action) => {
         case 'SET_FILENAME_SAVE':
             return Object.assign({}, state, {saveFilename: action.fileName})
         case 'SET_SAVED_FILES':
-            return Object.assign({}, state, {saves: action.listFiles})
-            
+            return Object.assign({}, state, {saves: action.listFiles})          
         case 'SET_FUNCTION_NAMES':
             return Object.assign({}, state, {functionNames: [...action.functionNames, "%None"]})
         case 'SET_SELECTED_FUNCTION_NAME':

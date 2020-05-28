@@ -40,7 +40,7 @@ var collectHTMLData = require("./libs/htmlParse").collectHTMLData
 
 var USE_PARTIAL = typeof process.env.USE_PARTIAL !== 'undefined' ? process.env.USE_PARTIAL : true;
 
-function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
+function renameVarWithNewName(expr, mapping, funcbodyMap, listParams, globalVars) {
   let newMapping = mapping;
   let newMappingBody;
   let changedExpr;
@@ -53,7 +53,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
     case 'BlockStatement':
       let newBodyExpr = [];
       expr.body.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams, globalVars);
         changedExpr = retValArr[0]
         newMappingBodyMerge = retValArr[1]
         newBodyExpr.push(changedExpr)
@@ -63,28 +63,28 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
       break
 
     case 'CatchClause':
-      retValArr = renameVarWithNewName(expr.param, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.param, newMapping, funcbodyMap, listParams, globalVars);
       expr.param = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.body, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.body, newMapping, funcbodyMap, listParams, globalVars);
       expr.body = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'TryStatement':
-      retValArr = renameVarWithNewName(expr.block, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.block, newMapping, funcbodyMap, listParams, globalVars);
       expr.block = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.handler, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.handler, newMapping, funcbodyMap, listParams, globalVars);
       expr.handler = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'LogicalExpression':
     case 'BinaryExpression':
     case 'AssignmentExpression':
-      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams, globalVars)
       expr.left = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams, globalVars)
       expr.right = retValArr[0]
       newMapping = retValArr[1]
       break
@@ -118,6 +118,10 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
         // its a parameter identifer dont change it
         return [expr, newMapping]
       }
+      if(globalVars.includes(expr.name)) {
+        // its a global identifer dont change it
+        return [expr, newMapping]
+      }
       if (funcbodyMap.get(expr.name)) {
         // its a function identifer dont change it
         return [expr, newMapping]
@@ -136,10 +140,20 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
         expr.randomised = true
       }
       break
+    case 'WhileStatement':
+      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap, listParams, globalVars);
+      expr.test = retValArr[0]
+      newMapping = retValArr[1]
+      break
+    case 'UpdateExpression':
+      retValArr = renameVarWithNewName(expr.argument, newMapping, funcbodyMap, listParams, globalVars);
+      expr.argument = retValArr[0]
+      newMapping = retValArr[1]
+      break
     case 'VariableDeclaration':
       let newDeclarations = [];
       expr.declarations.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams, globalVars);
         newDeclarations.push(retValArr[0])
         newMappingBodyMerge = retValArr[1]
         newMapping = new Map([...newMappingBodyMerge, ...newMapping])
@@ -147,50 +161,50 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
       expr.declarations = newDeclarations
       break
     case 'ExpressionStatement':
-      retValArr = renameVarWithNewName(expr.expression, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.expression, newMapping, funcbodyMap, listParams, globalVars)
       expr.expression = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'VariableDeclarator':
-      retValArr = renameVarWithNewName(expr.id, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.id, newMapping, funcbodyMap, listParams, globalVars)
       expr.id = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.init, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.init, newMapping, funcbodyMap, listParams, globalVars)
       expr.init = retValArr? retValArr[0]: expr.init
       newMapping = retValArr? retValArr[1]: newMapping
       break
     case 'CallExpression':
       let newArguments = [];
       expr.arguments.forEach(ex => {
-        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+        retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams, globalVars);
         changedExpr = retValArr[0]
         newMappingBodyMerge = retValArr[1]
         newArguments.push(changedExpr)
         newMapping = new Map([...newMappingBodyMerge, ...newMapping])
       })
       expr.arguments = newArguments
-      retValArr = renameVarWithNewName(expr.callee, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.callee, newMapping, funcbodyMap, listParams, globalVars);
       expr.callee = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'MemberExpression':
-      retValArr = renameVarWithNewName(expr.object, newMapping, funcbodyMap, listParams);
+      retValArr = renameVarWithNewName(expr.object, newMapping, funcbodyMap, listParams, globalVars);
       expr.object = retValArr? retValArr[0]: expr.object
       newMapping = retValArr? retValArr[1]: newMapping
-      // retValArr = renameVarWithNewName(expr.property, newMapping, funcbodyMap, listParams);
+      // retValArr = renameVarWithNewName(expr.property, newMapping, funcbodyMap, listParams, globalVars);
       // expr.property = retValArr? retValArr[0]: expr.property
       // newMapping = retValArr? retValArr[1]: newMapping
       break
     case 'BinaryExpression':
-      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.left, newMapping, funcbodyMap, listParams, globalVars)
       expr.left = retValArr[0]
       newMapping = retValArr[1]
-      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.right, newMapping, funcbodyMap, listParams, globalVars)
       expr.right = retValArr[0]
       newMapping = retValArr[1]
       break
     case 'ReturnStatement':
-        retValArr = renameVarWithNewName(expr.argument, newMapping, funcbodyMap, listParams)
+        retValArr = renameVarWithNewName(expr.argument, newMapping, funcbodyMap, listParams, globalVars)
         expr.argument = retValArr[0]
         newMapping = retValArr[1]
         break
@@ -199,7 +213,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
         let newConsequent = [];
         if (expr.consequent.length > 0) {
           expr.consequent.forEach(ex => {
-            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams, globalVars);
             changedExpr = retValArr[0]
             newMappingBodyMerge = retValArr[1]
             newConsequent.push(changedExpr)
@@ -207,7 +221,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
           })
           expr.consequent = newConsequent
         } else {
-          retValArr = renameVarWithNewName(expr.consequent, newMapping, funcbodyMap, listParams)
+          retValArr = renameVarWithNewName(expr.consequent, newMapping, funcbodyMap, listParams, globalVars)
           expr.consequent = retValArr[0]
           newMapping = retValArr[1]
         }
@@ -217,7 +231,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
         let newAlternate = [];
         if (expr.alternate.length > 0) {
           expr.alternate.forEach(ex => {
-            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams);
+            retValArr = renameVarWithNewName(ex, newMapping, funcbodyMap, listParams, globalVars);
             changedExpr = retValArr[0]
             newMappingBodyMerge = retValArr[1]
             newAlternate.push(changedExpr)
@@ -225,12 +239,12 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams) {
           })
           expr.alternate = newAlternate
         } else {
-          retValArr = renameVarWithNewName(expr.alternate, newMapping, funcbodyMap, listParams)
+          retValArr = renameVarWithNewName(expr.alternate, newMapping, funcbodyMap, listParams, globalVars)
           expr.alternate = retValArr[0]
           newMapping = retValArr[1]
         }
       }
-      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap, listParams)
+      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap, listParams, globalVars)
       expr.test = retValArr[0]
       newMapping = retValArr[1]
       break
@@ -874,8 +888,12 @@ var jstiller = (function() {
         varname: _obj.name
       };
     } else if (_obj && global_vars.indexOf(_obj.name) !== -1) { //Is a predefined variable?
-
       debug("In Global_VARS", _obj);
+      if (_obj.name === 'document' && astMemberExpr.property.type === 'MemberExpression') {
+        return {
+          resolved: false
+        }
+      }
       return {
         scope: scope,
         isGlobal: true,
@@ -1087,6 +1105,7 @@ var jstiller = (function() {
   var gscope = {} //Added for separating global from local.
   var scopes = [gscope];
   let funcBodyMap = new Map()
+  let globalVars = []
   let funcScope = {}
   var global_this = {
     "type": "Identifier",
@@ -1491,7 +1510,19 @@ var jstiller = (function() {
             let funcID = exp.id.name
             funcBodyMap.set(funcID, exp)
           }
+          if (exp.type === 'VariableDeclaration') {
+            let declarations = exp.declarations
+            declarations.forEach(declaration => {
+              if (!globalVars.includes(declaration.id.name)){
+                globalVars.push(declaration.id.name)
+              }
+            })
+
+          }
+          
+
         })
+
 
         let bodyReduced = ast.body.map(ast_reduce_scoped)
         let progBody = []
@@ -1517,7 +1548,15 @@ var jstiller = (function() {
               expr.expression.body.forEach(ex => {progBody.push(ex)})
             }
           }
-          progBody.push(expr)
+          if (expr.type === 'BlockStatement') {
+            // call expression can reduce to body of the function call
+            if (expr.body) {
+              expr.body.forEach(ex => {progBody.push(ex)})
+            }
+          } else {
+            progBody.push(expr)
+          }
+          
 
         })
 
@@ -1832,7 +1871,7 @@ var jstiller = (function() {
         }
 
         realCallee.called = true;
-
+        
         var c_arguments = ast.arguments? ast.arguments.map(a => ast_reduce_scoped(a, true)) : [];
         realCallee.called_with_args = c_arguments;
         ret.arguments = c_arguments;
@@ -2348,7 +2387,7 @@ var jstiller = (function() {
         }
 
         var calleeBody = realCallee.body ? realCallee.body : (realCallee.resolve_to ? realCallee.resolve_to.body : null);
-        if (calleeBody && calleeBody.pure) {
+        if (calleeBody && calleeBody.pure && calleeBody.value) {
 
           if (calleeBody.body && calleeBody.body.length > 0 && calleeBody.body[calleeBody.body.length - 1].type === "ReturnStatement") {
             return mkliteral(calleeBody.value);
@@ -2378,6 +2417,67 @@ var jstiller = (function() {
           return ast_reduce(calleeBody.body[0].argument, tmp_scope, expandvars, ast);
         }
 
+        if (realCallee.type === 'FunctionExpression') {
+          // anon function call
+          // set the args
+          let ParamAssignstatements = []
+          if (realCallee.params && c_arguments) {
+            // the same number of arguments called
+            realCallee.params.forEach((p , i) => {
+              // create the assignstatement instead of assigning it to scope
+              if (c_arguments[i]){
+                ParamAssignstatements.push({
+                  type: "VariableDeclaration",
+                  declarations:[{
+                    type: "VariableDeclarator",
+                    id: {
+                      type: "Identifier",
+                      name: p.name
+                    },
+                    init: c_arguments[i],
+                  }],
+                  kind: 'var'
+                })
+              }
+            })
+          }
+          let funcbody = realCallee.body;
+          let previousFuncPurity = funcbody.pure 
+          funcbody.pure = true
+          let newbody = [];
+          let mergeMap = new Map()
+          let funcBodyCopy = clonedeep(funcbody)
+          let listParams = realCallee.params
+          // add the assignment for the parameters
+          funcBodyCopy.body = ParamAssignstatements.concat(funcBodyCopy.body)
+          funcBodyCopy.body.forEach(ex =>{
+            let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams, globalVars)
+            newbody.push(retValNewName[0])
+            mergeMap = new Map([...retValNewName[1], ...mergeMap])
+          })
+          funcBodyCopy.body = newbody
+          let reducedBody = ast_reduce_scoped(funcBodyCopy);
+          funcBodyCopy.pure = previousFuncPurity
+
+          if (realCallee.params && c_arguments) {
+            // the same number of arguments called
+            realCallee.params.forEach((p , i) => {
+              if (scope[p.name] && scope[p.name].isParam) {
+                delete scope[p.name]
+              }
+            })
+          }
+          let calleeName = realCallee.name ?realCallee.name: 'Expression'
+          if (reducedBody.body.length > 0 && !isEqual(reducedBody.body[0], consoleLogExpr('Begining body of ' + calleeName))) {
+            reducedBody.body = [consoleLogExpr('Begining body of ' + calleeName)].concat(reducedBody.body)
+            reducedBody.body.push(consoleLogExpr('End body of ' + calleeName))
+          }
+          return reducedBody // need to change
+          // if we cant find a pure return statement, then this call is too hard to inline
+
+      }
+
+
         //
         if (realCallee.type === "Identifier") {
           valFromScope = findScope(realCallee.name, scope);
@@ -2398,25 +2498,35 @@ var jstiller = (function() {
               if (valFromScope.value.value.body && valFromScope.value.value.body.body) {
                 // check if this function returns something...
                 // if nothing gets returned then just return ast
-                let functionBodies = valFromScope.value.value.body.body;
-                let hasReturn = functionBodies.filter(function(e) {
+                let functionBodies = valFromScope.value.value.body;
+                let hasReturn = functionBodies.body.filter(function(e) {
                   return e.type === 'ReturnStatement';
                 }).length > 0;
-                if (hasReturn) {
-                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
-                    // the same number of arguments called
-                    valFromScope.value.value.params.map((p , i) => {
-                      scope[p.name] = {
-                        value: c_arguments[i],
-                        pure: c_arguments[i].pure,
-                        isParam: true
-                      }
+                let ParamAssignstatements = []
+
+                valFromScope.value.value.params.forEach((p , i) => {
+                  // create the assignstatement instead of assigning it to scope
+                  if (c_arguments[i]){
+                    ParamAssignstatements.push({
+                      type: "VariableDeclaration",
+                      declarations:[{
+                        type: "VariableDeclarator",
+                        id: {
+                          type: "Identifier",
+                          name: p.name
+                        },
+                        init: c_arguments[i],
+                      }],
+                      kind: 'var'
                     })
                   }
-                  // check if we have evaluated before, check in the scope
-                  let funcbody = valFromScope.value.value.body
-                  let previousFuncPurity = funcbody.pure 
-                  funcbody.pure = true
+                })
+                let funcBodyCopy = clonedeep(functionBodies)
+
+                if (hasReturn) {
+                  
+                  let previousFuncPurity = funcBodyCopy.pure 
+                  funcBodyCopy.pure = true
                   let newbody = [];
                   let mergeMap = new Map()
                   // Here we need to rename all the variables declarations and assignments with a random number append to the end of the variable name
@@ -2424,12 +2534,14 @@ var jstiller = (function() {
                   // PD = 10 -> PD_1624623412 = 10
                   let listParams = valFromScope.value.value.params
 
-                  let funcBodyCopy = clonedeep(funcbody)
+                  // let funcBodyCopy = clonedeep(funcbody)
                   funcBodyCopy.body.forEach(ex =>{
-                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams)
+                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams, globalVars)
                     newbody.push(retValNewName[0])
                     mergeMap = new Map([...retValNewName[1], ...mergeMap])
                   })
+                  newbody = ParamAssignstatements.concat(newbody)
+
                   funcBodyCopy.body = newbody
                   value = ast_reduce_scoped(funcBodyCopy);
                   // this will be the return value of the function call
@@ -2437,15 +2549,7 @@ var jstiller = (function() {
                   funcBodyCopy.pure = previousFuncPurity
                   // filter out any top level return statements
                   let noRetBody = value.body.filter(e => e.type !== "ReturnStatement")
-                  // remove all the params
-                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
-                    // the same number of arguments called
-                    valFromScope.value.value.params.map((p , i) => {
-                      if (scope[p.name].isParam) {
-                        delete scope[p.name]
-                      }
-                    })
-                  }
+                  
 
                   if (value.pure) {
                     let bodyRetVal = mkliteral(value.value);
@@ -2464,9 +2568,10 @@ var jstiller = (function() {
                         if (ex.pure) {
                           bodyRetVal = mkliteral(ex.argument.value);
                         }
-                        if (noRetBody.length > 0 && !isEqual(noRetBody[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
-                          noRetBody = [consoleLogExpr('Begining body of ' + realCallee.name)].concat(noRetBody)
-                          noRetBody.push(consoleLogExpr('End body of ' + realCallee.name))
+                        let calleeName = realCallee.name ?realCallee.name: 'Expression'
+                        if (noRetBody.length > 0 && !isEqual(noRetBody[0], consoleLogExpr('Begining body of ' + calleeName))) {
+                          noRetBody = [consoleLogExpr('Begining body of ' + calleeName)].concat(noRetBody)
+                          noRetBody.push(consoleLogExpr('End body of ' + calleeName))
                         }
                         
                         // noRetBody = noRetBody.map(ex => renameVarWithNewName(ex, new Map(), funcBodyMap))
@@ -2488,42 +2593,25 @@ var jstiller = (function() {
                   if (parent.type !== 'ExpressionStatement') {
                     return ast
                   }
-                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
-                    // the same number of arguments called
-                    valFromScope.value.value.params.map((p , i) => {
-                      scope[p.name] = {
-                        value: c_arguments[i],
-                        pure: c_arguments[i].pure,
-                        isParam: true
-                      }
-                    })
-                  }
+                  
                   let listParams = valFromScope.value.value.params
 
-                  let funcbody = valFromScope.value.value.body
-                  funcbody.pure = true
-                  let funcBodyCopy = clonedeep(funcbody)
                   let mergeMap = new Map() // this cant be new... should be inherited from the outer call....
                   let newbody = [];
                   funcBodyCopy.body.forEach(ex =>{
-                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams)
+                    let retValNewName = renameVarWithNewName(ex, mergeMap, funcBodyMap, listParams, globalVars)
                     newbody.push(retValNewName[0])
                     mergeMap = new Map([...retValNewName[1], ...mergeMap])
                   })
+                  newbody = ParamAssignstatements.concat(newbody)
+
                   funcBodyCopy.body = newbody
                   let reducedBody = ast_reduce_scoped(funcBodyCopy);
                   
-                  if (valFromScope.value.value.params && c_arguments && valFromScope.value.value.params.length === c_arguments.length) {
-                    // the same number of arguments called
-                    valFromScope.value.value.params.map((p , i) => {
-                      if (scope[p.name].isParam) {
-                        delete scope[p.name]
-                      }
-                    })
-                  }
-                  if (reducedBody.body.length > 0 && !isEqual(reducedBody.body[0], consoleLogExpr('Begining body of ' + realCallee.name))) {
-                    reducedBody.body = [consoleLogExpr('Begining body of ' + realCallee.name)].concat(reducedBody.body)
-                    reducedBody.body.push(consoleLogExpr('End body of ' + realCallee.name))
+                  let calleeName = realCallee.name ?realCallee.name: 'Expression'
+                  if (reducedBody.body.length > 0 && !isEqual(reducedBody.body[0], consoleLogExpr('Beginning body of ' + calleeName))) {
+                    reducedBody.body = [consoleLogExpr('Beginning body of ' + calleeName)].concat(reducedBody.body)
+                    reducedBody.body.push(consoleLogExpr('End body of ' + calleeName))
                   }
                   return reducedBody // need to change
                 }
@@ -2822,12 +2910,22 @@ var jstiller = (function() {
 
         var isLocal = false;
         valFromScope = false;
-        if (inLoop)
-          return ast;
+        // if (inLoop)
+        //   return ast;
         if (ast.name in scope) {
           //BUG WARNING: on MemberExpr. when local var has same name. we may have probl
           // TODO: find a workaround: var f={h:3}; function s(){   var t=3; f.t=2; /*f.*t* same name t.*/ }
           valFromScope = findScope(ast.name, scope);
+          // if (valFromScope.value && valFromScope.value.value 
+          //   && valFromScope.value.value.type === 'UpdateExpression' 
+          //   && valFromScope.value.value.argument
+          //   && valFromScope.value.value.argument.retVal
+          //   && valFromScope.value.value.argument.retVal.pure
+          //   ){
+          //   return mkliteral(valFromScope.value.value.argument.retVal.value)
+
+          // }
+
           isLocal = valFromScope.scope === scope && parent.type !== 'MemberExpression'
           debug("scoped", 'isLocal', valFromScope.scope === scope, 'isGlobal', scope === gscope);
           // console.log("scoped", 'isLocal', valFromScope.scope === scope, 'isGlobal', scope === gscope);
@@ -2897,6 +2995,7 @@ var jstiller = (function() {
         }
         
         if (expandvars && value) { //May not be enough. g.t.*e* ? on globalscope?         
+          value.pastIden = value.pastIden? value.pastIden: ast.name
           return value;
         } else {
           
@@ -2984,6 +3083,16 @@ var jstiller = (function() {
             : ast_reduce(ast.property, scope, false, ast)
         }
         // replace ['property'] with .property accessor
+        if (ret.object.type === 'ArrayExpression' && (ret.property.name === 'shift' || ret.property.name === 'push') && inLoop) {
+          // we are shifting an array in a loop, mark this the array as changed
+          if (ret.object.pastIden){
+            scope[ret.object.pastIden].changed = true
+          }
+          let idenName = ret.object.pastIden
+          // replace the ret object to just an identifier
+          ret.object = { type:'Identifier', name: idenName }
+        }
+
         _tretObj = ret.object;
         if (ret.object.retVal) {
           _tretObj = ret.object;
@@ -3236,7 +3345,7 @@ var jstiller = (function() {
         };
         let delcaredSubBodies = []
         ret.declarations.forEach(declaration => {
-          if (declaration.body) {
+          if (declaration.body && declaration.body.length > 0) {
             declaration.body.forEach(exp => {delcaredSubBodies.push(exp)})
           }
         })
@@ -3541,7 +3650,7 @@ var jstiller = (function() {
               // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.argument.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
-            }  else if (expr.body) {
+            }  else if (expr.body && expr.body.length > 0 && expr.type !== 'WhileStatement') {
               // NEED TO SEE IF THEY HAVE AN ASSIGNMENT STATEMENT OR VARIABLE DECLARATOR THAT WILL CHANGE THE VARIABLE IN THE CURRENT SCOPE
               expr.body.forEach(ex => {RetFlattenBody.push(ex)})
               RetFlattenBody.push(expr)
@@ -3762,7 +3871,7 @@ var jstiller = (function() {
 
       case 'DoWhileStatement':
       case 'WhileStatement':
-        // ++inLoop;
+        inLoop++;
         ret = {
           type: ast.type,
           /*Error.. should be considered if Not dependent by the cycle or not? 
@@ -3775,15 +3884,15 @@ var jstiller = (function() {
           ret.inlineBody = whiletestReduced.body
         }
         ret.test = whiletestReduced // Expand or Not?Lookahead?
-
         let whileBody =  ast_reduce(ast.body, scope, false, ast) 
-        if (whileBody.type === 'BreakStatement') {
+        if (whileBody && whileBody.type === 'BreakStatement') {
           // its justa  break as body, reduce as just the test
           whiletestReduced.inlineBody = ret.inlineBody 
+          inLoop--;
           return whiletestReduced
         }
-
-        // --inLoop;
+        ret.body = whileBody
+        inLoop--;
         return ret;
 
       case 'ForStatement':
@@ -3963,9 +4072,10 @@ var jstiller = (function() {
         }
         return ret;
       case 'UpdateExpression':
-        arg = ast_reduce_scoped(ast.argument);
+        arg = ast_reduce_scoped(ast.argument, scope, true);
+        // ast.argument = arg
         debug('UpdateExpression', arg, ast.argument)
-        if (inLoop) return ast;
+        if (inLoop ) return ast;
         if (ast.argument.type === "Identifier" || arg.type === "Identifier") {
           valFromScope = false
           if (ast.argument.name in scope)
@@ -3973,7 +4083,7 @@ var jstiller = (function() {
           if (arg.name in scope)
             valFromScope = findScope(arg.name, scope).value
           debug("valFromScope", valFromScope)
-          if (valFromScope) {
+          if (valFromScope && valFromScope.value) {
             if (ast.prefix) {
               if (valFromScope.value && valFromScope.value.value) {
                 valFromScope.value = uoperators[ast.operator](valFromScope.value.value)

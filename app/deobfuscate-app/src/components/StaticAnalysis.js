@@ -62,7 +62,6 @@ function StaticAnalysis (props) {
     .then(json => {
       console.log("JSON!!!")
       console.log(json)
-      // if ()
       if (path === '/save') {
         handleFilenameChange('')
       }
@@ -81,13 +80,6 @@ function StaticAnalysis (props) {
         setSavedFiles(json.listFiles)
 
       }
-      
-
-      // if (json.res){
-      //   let output = formatVariable(json.res)
-      //   setExeResult(output)
-      // } else {
-      // }
     }).catch(err => {
       setCode("Error in fetch");
       throw(err)
@@ -166,7 +158,7 @@ function StaticAnalysis (props) {
             Undo transformation
           </Button>
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/checkpoint')}>
-            Checkpoint
+            Manual Change
           </Button>
           <TextField label="Filename to save" onChange={e => handleFilenameChange(e.target.value)} value={saveFilename}/>
           <Button variant="contained" color="primary" onClick={() => handleClick(code, '/save', saveFilename)}>
