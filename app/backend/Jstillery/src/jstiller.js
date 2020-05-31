@@ -110,6 +110,7 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams, globalVars
         case 'deleteFile':
         case 'update':
         case 'WScript':
+        case "RegExp":
           return [expr, newMapping]
       }
       // check if the expr.name exisit in list param
@@ -1107,6 +1108,8 @@ var jstiller = (function() {
   let funcBodyMap = new Map()
   let globalVars = []
   let funcScope = {}
+  let lastCallee;
+  let currentFuncDeclaration;
   var global_this = {
     "type": "Identifier",
     "name": "window"
@@ -1623,9 +1626,16 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
           operator: ast.operator,
-          left: ast_reduce(ast.left, scope, false, ast),
-          right: ast_reduce_scoped(ast.right)
+        //   left: ast_reduce(ast.left, scope, false, ast),
         };
+        let retLeft = ast_reduce(ast.left, scope, false, ast)
+        // let retRight = ast_reduce(ast.right, scope, false, ast)
+        if (retLeft.type === 'Literal') {
+          retLeft = ast.left
+        }
+        ret.left = retLeft
+        ret.right =  ast_reduce_scoped(ast.right)
+
         debug("OPERATION: AssignmentExpression", parent, (ret))
         // console.log("OPERATION: AssignmentExpression", parent, (ret))
         if (ret.right.body) {
@@ -2480,6 +2490,11 @@ var jstiller = (function() {
 
         //
         if (realCallee.type === "Identifier") {
+          if (currentFuncDeclaration === realCallee.name){
+            // recursive call no need to unfold
+            return ast
+          }
+
           valFromScope = findScope(realCallee.name, scope);
           let funcDeclaration = funcBodyMap.get(realCallee.name)
           if (!valFromScope && funcDeclaration) {
@@ -2492,7 +2507,9 @@ var jstiller = (function() {
           }
           if (valFromScope && valFromScope.value && valFromScope.value.value) {
             if (valFromScope.value.value.type === 'FunctionExpression' || valFromScope.value.value.type === 'FunctionDeclaration') {
-              if (!valFromScope.value.value.alreadyReduced) {
+              if (!valFromScope.value.value.alreadyReduced && lastCallee !== realCallee.name) {
+                // need to check if its a recursive call
+                lastCallee = realCallee.name
                 value = ast_reduce_scoped(valFromScope.value.value);  
               }
               if (valFromScope.value.value.body && valFromScope.value.value.body.body) {
@@ -2608,7 +2625,7 @@ var jstiller = (function() {
                   funcBodyCopy.body = newbody
                   let reducedBody = ast_reduce_scoped(funcBodyCopy);
                   
-                  let calleeName = realCallee.name ?realCallee.name: 'Expression'
+                  let calleeName = realCallee.name ? realCallee.name: 'Expression'
                   if (reducedBody.body.length > 0 && !isEqual(reducedBody.body[0], consoleLogExpr('Beginning body of ' + calleeName))) {
                     reducedBody.body = [consoleLogExpr('Beginning body of ' + calleeName)].concat(reducedBody.body)
                     reducedBody.body.push(consoleLogExpr('End body of ' + calleeName))
@@ -3517,7 +3534,7 @@ var jstiller = (function() {
 
       case 'FunctionDeclaration':
       //Eg function f(b){cc} 
-
+        currentFuncDeclaration = ast.id.name
         fscope = Object.create(scope);
         fscope.externalRefs = [];
         fscope.closed = true;
@@ -3547,6 +3564,8 @@ var jstiller = (function() {
           generator: ast.generator,
           expression: ast.expression
         };
+        currentFuncDeclaration = null
+
         if (ast.id) {
           set_scope(scope, ast.id.name, {
             value: ret,
@@ -3629,7 +3648,21 @@ var jstiller = (function() {
         ret = {
           type: ast.type,
         };
-        let RetBody = ast.body.map(ast_reduce_scoped)
+        let RetBody = []
+        for(let i = 0; i < ast.body.length; i++) {
+          let res = ast_reduce_scoped(ast.body[i])
+          if (res){
+            RetBody.push(res)
+          }
+          if (res && res.type === 'ReturnStatement') {
+            break
+          }
+        }
+
+        // let RetBody = ast.body.map(expr => {
+        //   if (res.)
+        //   return res
+        // })
         taintedScope = null
         let RetFlattenBody = []
         // let currentScopeDeclared = []

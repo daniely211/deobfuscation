@@ -150,23 +150,33 @@
 // }
 // `
 
+// const initCode = `
+// function R(K) {
+//     var PD = 3
+//     var x = cN()
+//     if (PD < 10)
+//         return false;
+//     return true
+// }
+
+// function cN(N) {
+//     var PD = 7
+//     PD = 10
+//     return true;
+// }
+// R(1)
+// `
+
 const initCode = `
 function R(K) {
-    var PD = 3
-    var x = cN()
-    if (PD < 10)
-        return false;
-    return true
-}
-
-function cN(N) {
-    var PD = 7
-    PD = 10
-    return true;
+    if (K > 5) {
+        return K
+    }
+    
+    return R(K + 1)
 }
 R(1)
 `
-
 
 // const initCode = `
 // function R(K) {
