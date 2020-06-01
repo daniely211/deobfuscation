@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www NODE_DEBUG=jstillery"
+    "start": "node ./bin/www "
   },
   "dependencies": {
     "@anshckr/fix-js": "^1.6.4",

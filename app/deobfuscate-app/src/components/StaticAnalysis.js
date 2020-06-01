@@ -46,8 +46,9 @@ function StaticAnalysis (props) {
   const classes = useStyles();
   const handleClick = (code, path, filename=null) => {
     setOldCode(code);
-
-    fetch(`http://localhost:3001${path}`, {
+    let url = window.location.href
+    url = (url === 'http://localhost:3000/')? ' http://localhost:3001/': url
+    fetch(`${url}${path}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -62,7 +63,7 @@ function StaticAnalysis (props) {
     .then(json => {
       console.log("JSON!!!")
       console.log(json)
-      if (path === '/save') {
+      if (path === 'save') {
         handleFilenameChange('')
       }
       if (json.source) {
@@ -142,26 +143,26 @@ function StaticAnalysis (props) {
 
         </div>
         <div className={classes.buttons}>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/constantProp')}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'constantProp')}>
             Evaluate Constants
           </Button>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/pretty')}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'pretty')}>
             Prettify
           </Button>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/unused')}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'unused')}>
             Remove Unused Variables
           </Button>
           {/* <Button variant="contained" color="primary" onClick={() => handleClick(code, '/unusedFunctions')}>
             Remove Unused Functions
           </Button> */}
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/undo')}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'undo')}>
             Undo transformation
           </Button>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/checkpoint')}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'checkpoint')}>
             Manual Change
           </Button>
           <TextField label="Filename to save" onChange={e => handleFilenameChange(e.target.value)} value={saveFilename}/>
-          <Button variant="contained" color="primary" onClick={() => handleClick(code, '/save', saveFilename)}>
+          <Button variant="contained" color="primary" onClick={() => handleClick(code, 'save', saveFilename)}>
             Save Progress
           </Button>
           {/* <FormControl className={classes.formControl}>

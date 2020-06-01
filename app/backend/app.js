@@ -25,6 +25,7 @@ const babelCore = require('babel-core')
 const prettier = require('prettier')
 const commentRemover = require('./commentRemover')
 const fs = require('fs')
+
 function babelFormat (code) {
   return prettier.format(code)
     .split('\n')
@@ -84,6 +85,17 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 let codeRecord = []
+
+
+const dev = app.get('env') !== 'production'
+if (!dev){
+  app.use(express.static(path.resolve(__dirname, 'build')))
+  console.log("Production")
+  app.get('/', (req, res) => {
+    console.log("Sending index")
+    res.sendFile(path.resolve(__dirname, 'build', 'index.html'))
+  })
+}
 
 function RemoveCommnets(code) {
   let newCode = code.replace(`"//"`, `"/"+"/"`)
@@ -724,20 +736,23 @@ app.post('/execute', function(req, res) {
 
 
 // view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
-app.use(logger('dev'));
+// app.set('views', path.join(__dirname, 'views'));
+// app.set('view engine', 'jade');
+// app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/', indexRouter);
+// app.use(express.static(path.join(__dirname, 'public')));
+// app.use('/', indexRouter);
 // app.use('/pretty', prettyRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   next(createError(404));
 });
+
+
+
 
 // error handler
 app.use(function(err, req, res, next) {
@@ -747,7 +762,7 @@ app.use(function(err, req, res, next) {
 
   // render the error page
   res.status(err.status || 500);
-  res.render('error');
+  res.json({error: err});
 });
 
 module.exports = app;

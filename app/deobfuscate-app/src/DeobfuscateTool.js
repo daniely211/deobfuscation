@@ -104,6 +104,8 @@ function DeobfuscateTool(props) {
   const classes = useStyles();
   const [value, setValue] = React.useState(0);
   const [drawerTabValue, setDrawerTabValue] = React.useState(0);
+  let url = window.location.href
+  url = (url === 'http://localhost:3000/')? ' http://localhost:3001/': url
 
 
   const codeTreeTrans = parseTree(codeTree)
@@ -123,7 +125,7 @@ function DeobfuscateTool(props) {
   }
 
   const clearHistory = () => {
-    fetch(`http://localhost:3001/clearHistory`, {
+    fetch(`${url}clearHistory`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -142,7 +144,7 @@ function DeobfuscateTool(props) {
   
   }
   const loadFile = (filename) => {
-    fetch(`http://localhost:3001/load`, {
+    fetch(`${url}load`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -169,7 +171,7 @@ function DeobfuscateTool(props) {
   }
 
   const onSelectCodeID = (selectedNode, diff) => {
-    fetch(`http://localhost:3001/getNode`, {
+    fetch(`${url}getNode`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -205,7 +207,7 @@ function DeobfuscateTool(props) {
     //   document.removeEventListener('keydown', refreshHandler);
     // };
     if (!fetched) {
-      fetch(`http://localhost:3001/getHistory`, {
+      fetch(`${url}getHistory`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -296,7 +298,7 @@ function DeobfuscateTool(props) {
     <main className={classes.content}>
       <StaticAnalysis value={value} index={0}/>
       {/* <DynamicAnalysis value={value} index={1}/> */}
-      <JSConsole/>
+      {/* <JSConsole/> */}
     </main>
     </React.Fragment>
   );
