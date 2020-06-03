@@ -210,6 +210,9 @@ function renameVarWithNewName(expr, mapping, funcbodyMap, listParams, globalVars
         newMapping = retValArr[1]
         break
     case 'IfStatement':
+      retValArr = renameVarWithNewName(expr.test, newMapping, funcbodyMap, listParams, globalVars)
+      expr.test = retValArr[0]
+      newMapping = retValArr[1]
       if (expr.consequent) {
         let newConsequent = [];
         if (expr.consequent.length > 0) {
